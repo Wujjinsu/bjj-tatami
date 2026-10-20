@@ -1,0 +1,39 @@
+BJJ TATAMI - commandes tactiles pour RetroArch Android (paysage)
+================================================================
+
+1. COPIER LES FICHIERS
+   Copier le dossier "overlay" (bjj-tatami.png + bjj-tatami.cfg) dans le dossier
+   des surimpressions de RetroArch, sous le nom "bjj-tatami" :
+     /storage/emulated/0/RetroArch/overlays/bjj-tatami/
+   (si ce dossier n'existe pas : RetroArch > Parametres > Dossiers >
+    Surimpressions, pour voir le chemin utilise par ton RetroArch)
+
+2. LANCER LE JEU
+   Charger la ROM bjj-tatami.bin avec le coeur Genesis Plus GX.
+
+3. CHOISIR LA SURIMPRESSION
+   Menu rapide > Parametres (ou Parametres > Affichage a l'ecran) >
+   Surimpression a l'ecran :
+     - Afficher la surimpression : OUI
+     - Preregler la surimpression : overlays/bjj-tatami/bjj-tatami.cfg
+     - Opacite : 0.70 (au gout)
+     - Masquer la surimpression quand une manette est connectee : OUI
+     - Mise a l'echelle automatique / Auto-Scale : NON
+   Format d'image du jeu : 4:3 (Parametres > Video > Mise a l'echelle).
+
+4. GARDER CE REGLAGE POUR CE JEU SEULEMENT
+   Menu rapide > Surcharges > Sauvegarder les surcharges du jeu.
+   Les autres jeux gardent ton overlay habituel.
+
+LES BOUTONS
+   Croix (gauche) : se deplacer, choisir le niveau sur l'ecran titre
+   A : projection / progresser       B : tirer la garde / soumission
+   C : sprawl                         START : commencer / rejouer
+   Bouton rond en haut a gauche : menu RetroArch
+   Pendant une lutte, tous les boutons comptent : tape A, B et C en alternance
+   avec deux doigts pour marteler plus vite.
+
+AUTRE TAILLE D'ECRAN
+   L'overlay est cale pour un ecran 20:9 (2400x1080). Sur un ecran 16:9 il
+   fonctionne aussi mais les boutons empietent un peu sur l'image : me le dire,
+   je fais une version 16:9 (tools/gen_overlay.py, variables W et H).
