@@ -1,0 +1,43 @@
+name: Compiler la ROM
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Recuperer le projet
+        uses: actions/checkout@v4
+
+      - name: Installer Java (pour rescomp)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Recuperer SGDK 2.11
+        run: git clone --depth 1 --branch v2.11 https://github.com/Stephane-D/SGDK.git C:\SGDK
+
+      - name: Compiler
+        shell: cmd
+        run: C:\SGDK\bin\make -f C:\SGDK\makefile.gen
+
+      - name: Garder la ROM (onglet Actions)
+        uses: actions/upload-artifact@v4
+        with:
+          name: bjj-tatami-rom
+          path: out/rom.bin
+
+      - name: Publier la ROM (page Releases, facile depuis le telephone)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp out/rom.bin bjj-tatami.bin
+          gh release delete rom --yes --cleanup-tag || true
+          gh release create rom bjj-tatami.bin --title "BJJ Tatami - derniere ROM" --notes "Compilee automatiquement depuis ${GITHUB_SHA::7}" --latest

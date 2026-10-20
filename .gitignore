@@ -1,0 +1,6 @@
+out/
+res/resources.s
+res/resources.h
+res/resources.d
+*.mp3
+__pycache__/

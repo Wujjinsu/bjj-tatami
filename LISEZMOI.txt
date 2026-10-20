@@ -1,0 +1,81 @@
+BJJ TATAMI - prototype de jeu de jiu-jitsu bresilien pour Mega Drive (SGDK 2.11)
+==============================================================================
+
+COMPILER (Windows)
+  1. Telecharger SGDK 2.11 : https://github.com/Stephane-D/SGDK/releases
+     et le decompresser, par exemple dans C:\SGDK
+  2. Installer Java (necessaire a rescomp, l'outil qui convertit les images).
+  3. Ouvrir une invite de commandes dans ce dossier :
+        set GDK=C:\SGDK
+        build.bat
+  4. La ROM est creee dans out\rom.bin
+
+  Linux/macOS : utiliser SGDK via marsdev ou l'image Docker de SGDK,
+  puis "make -f $GDK/makefile.gen" dans ce dossier.
+
+JOUER
+  RetroArch (coeur Genesis Plus GX ou PicoDrive) ou BlastEm.
+  Manette 3 boutons suffit.
+
+COMMANDES
+  Ecran titre : GAUCHE / DROITE = niveau, START = combat
+  Debout      : GAUCHE / DROITE = se deplacer
+                A = projection (double leg) - il faut etre pres
+                B = tirer la garde
+                C = sprawl (contre une projection, au bon moment)
+  Au sol      : A = progresser (dessus) / balayer, s'echapper (dessous)
+                B = soumission (quand elle est disponible)
+  Lutte       : marteler A, B ou C pour pousser la jauge vers TOI.
+
+REGLES
+  Match de 2 minutes. Points IBJJF : projection 2, balayage 2,
+  passage de garde 3, montee 4, prise de dos 4.
+  Avantage : garde ouverte, ou action presque reussie.
+  Soumission reussie = victoire immediate.
+  Le SOUFFLE (barre sous le score) baisse a chaque effort et donne de la
+  force aux appuis : un combattant epuise pousse moins fort. Dessous, en
+  controle lateral, montee ou dos, on recupere moins vite.
+
+POSITIONS ET ACTIONS
+  Dessus : garde fermee -> demi-garde -> controle lateral -> montee -> dos
+  Dessous : balayage depuis la garde, reprise de garde, sortie, upa, retournement
+  Soumissions : cle de cheville (dans la garde, dessus), triangle (garde, dessous),
+                kimura (controle lateral), cle de bras (montee), etranglement (dos)
+
+MUSIQUE DE L'ECRAN TITRE
+  Extraite de "Jiu-Jitsu Evolucao" : l'intro (0 a 11,3 s) jouee une fois, puis
+  une boucle de 8,4 s (11,31 s a 19,68 s), en PCM 8 bits 13,4 kHz comme les voix
+  digitalisees des jeux Mega Drive. Pas d'IA d'isolation disponible : seule
+  l'intro, qui semble deja instrumentale, est utilisee.
+  Pour utiliser une autre partie du morceau :
+    1. Isoler l'instrumental chez toi (Ultimate Vocal Remover, gratuit, Windows).
+    2. python3 tools/convert_music.py instrumental.wav DEBUT_BOUCLE FIN_BOUCLE
+    3. Recompiler. Penser a couper la boucle pile sur un temps fort.
+  ROM : environ 260 Ko de musique (430 Ko de sons au total). Garde ce morceau pour un usage perso :
+  ne diffuse pas la ROM publiquement sans l'accord de l'artiste.
+
+PUBLIC (pendant le match)
+  Extrait de "Final Brasileiro Kids CBJJ 2024" (son de salle, sans commentaire) :
+  ambiance vers 0'51", petite acclamation vers 5'31", grosse vers 4'45".
+  Driver PCM4 de SGDK : voie 1 = ambiance en boucle (3,6 s), voie 2 = acclamations.
+  - L'ambiance monte pendant les luttes et apres chaque action.
+  - Petite acclamation : projection, balayage, passage, montee, dos, sortie.
+  - Grosse acclamation : fin du match.
+  Volumes reglables dans crowdUpdate() et crowdStart().
+  Meme remarque que pour la musique : usage perso uniquement.
+
+FICHIERS
+  src/main.c            tout le code du jeu
+  res/resources.res     liste des images pour rescomp
+  res/bg, res/sprites   images (PNG 16 couleurs)
+  res/music             musique de l'ecran titre (WAV 13,4 kHz)
+  res/sfx               bruits du public (WAV 16 kHz)
+  tools/gen_art.py      regenere les images (python3 + Pillow)
+  tools/convert_music.py convertit un morceau en musique d'ecran titre
+
+REGLAGES FACILES (src/main.c)
+  MATCH_SECONDS  duree du match
+  cpuPressRate   vitesse de martelage du CPU par niveau (sur 256 par image)
+  cpuSprawlPct   probabilite que le CPU contre une projection
+  GAUGE_MAX      longueur de la jauge de lutte
+  movePower()    difficulte de chaque soumission / sortie selon la position
