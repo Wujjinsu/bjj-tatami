@@ -83,6 +83,8 @@ void showBackground(const Image* img)
 {
     VDP_clearTextArea(0, 0, 40, 28);
     VDP_drawImageEx(BG_B, img, TILE_ATTR_FULL(PAL0, FALSE, FALSE, FALSE, TILE_USER_INDEX), 0, 0, TRUE, DMA);
+    /* l'image peut charger plus de 16 couleurs et ecraser PAL1-PAL3 : on les remet */
+    applyPlayerPalettes();
 }
 
 void buildFighterPalette(u16* pal, const FighterDef* f, u8 gi, u16 textColor)
