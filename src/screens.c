@@ -353,9 +353,7 @@ static void drawCard(u16 side)
         scat(b, lab[s] + 0, 23);
         b[5] = 0;
         wtxt(b, x, 19 + s);
-        for (k = 0; k < 9; k++) b[k] = (k < f->stat[s]) ? '#' : '-';
-        b[9] = 0;
-        gtxt(b, x + 6, 19 + s);
+        for (k = 0; k < 9; k++) putTile(x + 6 + k, 19 + s, (k < f->stat[s]) ? HT_SUB_BOTH : HT_SUB_EMPTY);
     }
     wtxt(subFamilyName[f->special], x, 24);
     flagAt(f->flag, x + 13, 17);
