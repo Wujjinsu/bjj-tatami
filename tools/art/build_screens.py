@@ -144,6 +144,15 @@ def title():
     # sol du badge
     cv.a[(yy > cy + 42) & (r <= inner)] = P3(DGR)
     cv.a[(yy == cy + 42) & (r <= inner)] = P3(K)
+    # blason du club (Ronin Fight Team) en haut a droite
+    from logo import badge
+    b = badge(70, 66, subtitle=True)
+    cv.rect(248, 0, 320, 72, P3(K))
+    cv.rect(248, 0, 249, 71, P3(YE))
+    cv.rect(248, 70, 320, 71, P3(YE))
+    for y in range(66):
+        for x in range(70):
+            cv.a[2 + y, 249 + x] = P3(int(b[y, x]))
     # bande du menu
     cv.a[190:, :] = P3(NV)
     cv.a[190, :] = P3(YE)

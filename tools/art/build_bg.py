@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_ui import PAL3  # noqa: E402
 from render import to_vdp  # noqa: E402
 from font import glyph  # noqa: E402
+from logo import banner  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 W, H = 512, 224
@@ -223,6 +224,15 @@ def mat(cv, main=(BL3, DBL3), border=(YE3, OR3), y0=FLOOR_TOP, stripe=8, seam_pe
                     cv.px(x, y, P3(WH3) if d < 0.25 and (x // 2 + y) % 2 == 0 else P3(main[0]))
 
 
+def club_banner(cv, x, y, w=56, h=64):
+    """etendard du club (Ronin Fight Team), tuiles PAL3 alignees."""
+    assert x % 8 == 0 and y % 8 == 0 and w % 8 == 0 and h % 8 == 0
+    b = banner(w, h)
+    for yy in range(h):
+        for xx in range(w):
+            cv.px(x + xx, y + yy, P3(int(b[yy, xx])))
+
+
 def ad_boards(cv, y0, y1, items):
     """Panneaux publicitaires (PAL3) le long de la barriere."""
     cv.rect(0, y0, W, y1, P3(K3))
@@ -267,10 +277,13 @@ def stage_arena():
             for xx in range(int(x - spread), int(x + spread)):
                 if (xx + y) % 2 == 0 and cv.a[y, xx % W] == 1:
                     cv.px(xx, y, 14)
+    # etendards du club accroches au-dessus des gradins
+    for x in (96, 352):
+        club_banner(cv, x, 56, 56, 64)
     # barriere publicitaire (PAL3)
     ad_boards(cv, 120, 144, [(BL3, WH3, "BJJ TATAMI", 96), (YE3, K3, "OSS!", 48), (RD3, WH3, "JIU-JITSU", 80),
                              (WH3, BL3, "TATAMI", 64), (GR3, YE3, "BRASIL", 64), (K3, YE3, "MUNDIAL", 64),
-                             (YE3, RD3, "OSS!", 48), (BL3, YE3, "16BIT", 48)])
+                             (K3, RD3, "RONIN F.T.", 96)])
     mat(cv, center_light=False)
     return cv, pal0
 
@@ -299,8 +312,10 @@ def stage_academy():
         for k in range(8):
             cv.px(x + 6 + k * 2, 54 + k, 15)
     # drapeaux et ceintures accrochees (PAL3 sur tuiles alignees)
-    for x in range(96, W, 128):
+    for x in (96, 352):
         flag_bra(cv, x, 56)
+    for x in (224, 480):
+        club_banner(cv, x, 56, 56, 56)
     for x in range(160 - 64, W, 256):
         cv.rect(x, 112, x + 56, 128, P3(K3))
         cv.rect(x + 1, 113, x + 55, 127, P3(WH3))
@@ -344,6 +359,16 @@ def flag_bra(cv, x, y):
 
 
 # ---------------------------------------------------------------- plage
+def beach_flag(cv):
+    """drapeau du club plante sur la plage (mat en PAL0, toile en PAL3)."""
+    for y in range(52, 112):
+        cv.px(185, y, 0)
+        cv.px(186, y, 14)
+        cv.px(187, y, 0)
+    cv.disc(186, 52, 1.6, 15, wrap=False)
+    club_banner(cv, 192, 56, 56, 56)
+
+
 def stage_beach():
     pal0 = [(36, 18, 54), (255, 182, 72), (255, 145, 54), (218, 90, 72), (145, 54, 90), (72, 36, 90),
             (255, 218, 145), (36, 54, 109), (54, 90, 145), (109, 145, 182), (18, 36, 54), (218, 164, 109),
@@ -389,6 +414,7 @@ def stage_beach():
     cv.rect(0, 136, W, 137, P3(OR3))
     # tapis sur le sable
     mat(cv, main=(RD3, DR3), border=(YE3, OR3), center_light=False)
+    beach_flag(cv)
     # palmiers (bords, PAL0) : tronc + palmes, devant la mer
     for px_ in (40, 296):
         for k in range(46):
