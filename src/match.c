@@ -224,6 +224,8 @@ static void drawHud(void)
     for (k = 0; k < 40; k++) line[k] = ' ';
     line[40] = 0;
     put(line, 1, P[0].label);
+    numStr(P[0].points, 2, b); put(line, 9, b);          /* chiffres deja la : pas de trou */
+    numStr(P[1].points, 2, b); put(line, 29, b);
     put(line, 12, "A"); numStr(P[0].adv, 1, b); put(line, 13, b);
     put(line, 15, "P"); numStr(P[0].pen, 1, b); put(line, 16, b);
     numStr((s16)(secs / 60), 1, b); put(line, 18, b);
