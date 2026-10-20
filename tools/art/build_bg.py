@@ -302,9 +302,9 @@ def stage_academy():
     for x in range(96, W, 128):
         flag_bra(cv, x, 56)
     for x in range(160 - 64, W, 256):
-        cv.rect(x + 64, 16, x + 120, 32, P3(K3))
-        cv.rect(x + 65, 17, x + 119, 31, P3(WH3))
-        cv.text("OSS", x + 82, 21, P3(RD3))
+        cv.rect(x, 112, x + 56, 128, P3(K3))
+        cv.rect(x + 1, 113, x + 55, 127, P3(WH3))
+        cv.text("OSS", x + 18, 117, P3(RD3))
     # rack de ceintures
     for x in range(0, W, 256):
         cv.rect(x + 200, 112, x + 248, 114, 5)
@@ -362,7 +362,7 @@ def stage_beach():
     # Pain de Sucre et collines (silhouettes)
     for x in range(W):
         dx = (x - 120) / 22.0
-        dome = 62 * math.sqrt(max(0.0, 1 - dx * dx)) if abs(dx) < 1 else 0
+        dome = 50 * math.sqrt(max(0.0, 1 - dx * dx)) if abs(dx) < 1 else 0
         h1 = 18 + max(dome, 30 * math.exp(-((x - 150) / 30) ** 2)) + 6 * math.sin(x / 37.0) \
             + 26 * math.exp(-((x - 440) / 40) ** 2)
         top = int(108 - h1)
@@ -403,7 +403,28 @@ def stage_beach():
     return cv, pal0
 
 
-STAGES = [("arena", stage_arena), ("academy", stage_academy), ("beach", stage_beach)]
+def hud_band(cv):
+    """bandeau du tableau de score (lignes 0-55) : fond sombre uni, liseres dores."""
+    cv.rect(0, 0, W, 56, P3(NV3))
+    cv.dither(0, 0, W, 6, P3(K3))
+    for x in range(0, W, 32):
+        for k in range(4):
+            cv.px(x + 8 + k, 50 - k, P3(DBL3))
+    cv.rect(0, 52, W, 53, P3(K3))
+    cv.rect(0, 53, W, 54, P3(OR3))
+    cv.rect(0, 54, W, 55, P3(YE3))
+    cv.rect(0, 55, W, 56, P3(K3))
+
+
+def with_band(fn):
+    def g():
+        cv, pal0 = fn()
+        hud_band(cv)
+        return cv, pal0
+    return g
+
+
+STAGES = [("arena", with_band(stage_arena)), ("academy", with_band(stage_academy)), ("beach", with_band(stage_beach))]
 
 
 def main():

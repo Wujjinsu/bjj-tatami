@@ -252,7 +252,8 @@ static void groundHints(void)
     scat(b, P[top].label, 40);
     scat(b, " DESSUS - ", 40);
     scat(b, posName[pos], 40);
-    wtxtC(b, 7);
+    clearRow(6);
+    wtxtC(b, 6);
     if (!helpOn || !P[0].human || numHumans != 1) { hudClearHints(); return; }
     for (d = 0; d < 3; d++)
     {
@@ -286,7 +287,7 @@ static void endMatch(s16 winner, const char* method, bool bySub, u16 ban)
     pend = FALSE;
     hudSubClear();
     hudClearHints();
-    clearRow(7);
+    clearRow(6);
     fxBanner(ban, 150);
     crowdReact(TRUE);
     stageCheer(300);
@@ -429,7 +430,7 @@ static void enterStand(void)
     P[0].dir = (P[0].x < P[1].x) ? 1 : -1;
     P[1].dir = -P[0].dir;
     standHints();
-    clearRow(7);
+    clearRow(6);
 }
 
 static void seqDone(void)
@@ -936,7 +937,7 @@ static void startSub(u16 who, const SubMove* s)
     subLayout();
     P[0].aiTimer = P[1].aiTimer = 0;
     hudClearHints();
-    clearRow(7);
+    clearRow(6);
     hudMessageWho(who, s->name, 0);
     sfx(880, 10);
     crowdReact(FALSE);
@@ -1077,7 +1078,7 @@ void match_enter(void)
     next = NX_FIGHT;
     fxBanner(BAN_OSS, 80);
     stageCheer(120);
-    if (gameType == GAME_DEMO) wtxtC("DEMO - APPUIE SUR START", 22);
+    if (gameType == GAME_DEMO) wtxtC("DEMO - APPUIE SUR START", 27);
     actorsDraw();
     SPR_update();
     fadeInScreen(16);

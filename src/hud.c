@@ -4,7 +4,9 @@
  */
 #include "game.h"
 
-#define ROW_MSG     6
+#define ROW_MSG     5
+#define TUG_BASE    1040                /* jauge du mini-jeu (20 tuiles dynamiques) */
+#define TUG_TILES   20
 #define BAR_TILES   16
 #define BAR_PX      (BAR_TILES * 8)
 
@@ -141,12 +143,13 @@ void hudDraw(s32 framesLeft, bool full)
         }
         if (full || P[p].grip / 20 != lastGrip[p])
         {
-            char g[7];
             u16 k, n = P[p].grip / 20;
-            for (k = 0; k < 5; k++) g[k] = (k < n) ? '#' : (P[p].grip > 0 ? '-' : ' ');
-            g[5] = 0;
-            if (P[p].grip > 0) gtxt(g, p == 0 ? 7 : 28, 4);
-            else VDP_clearText(p == 0 ? 7 : 28, 4, 5);
+            for (k = 0; k < 5; k++)
+            {
+                u16 x = (p == 0) ? 7 + k : 32 - k;
+                if (P[p].grip > 0) putTile(x, 4, k < n ? HT_SUB_ATT : HT_SUB_EMPTY);
+                else VDP_setTileMapXY(BG_A, 0, x, 4);
+            }
             lastGrip[p] = n;
         }
     }
@@ -216,6 +219,36 @@ void hudClearHints(void)
     VDP_clearTextArea(0, 24, 40, 4);
 }
 
+static u32 tugData[TUG_TILES][8];
+
+static void buildTug(s16 tug)
+{
+    const s16 W = TUG_TILES * 8, mid = W / 2;
+    s16 pos = mid + (tug * (mid - 3)) / 100;
+    bool hot = (frameCount >> 2) & 1;
+    u16 t, row, px;
+    for (t = 0; t < TUG_TILES; t++)
+        for (row = 0; row < 8; row++)
+        {
+            u32 w = 0;
+            for (px = 0; px < 8; px++)
+            {
+                s16 x = t * 8 + px;
+                u16 col;
+                if (row == 0 || row == 7 || x == 0 || x == W - 1) col = K;
+                else if (x >= pos - 1 && x <= pos + 1) col = (row < 2 || row > 5) ? K : WH;
+                else if (x == mid) col = YE;
+                else if (pos < mid && x > pos && x < mid) col = (row == 1) ? WH : ((row < 4) ? GR : DGR);
+                else if (pos > mid && x < pos && x > mid)
+                    col = (row == 1) ? (hot && tug > 70 ? WH : OR) : ((row < 4) ? RD : DR);
+                else col = (x < mid) ? (((x + row) & 3) ? DGR : K) : (((x + row) & 3) ? DR : K);
+                w = (w << 4) | col;
+            }
+            tugData[t][row] = w;
+        }
+    VDP_loadTileData((const u32*)tugData, TUG_BASE, TUG_TILES, DMA_QUEUE);
+}
+
 /* ------------------------------------------------------------------ mini-jeu de soumission */
 void hudSubGauge(const char* name, u16 gate, s16 a0, s16 alen, s16 d0, s16 dlen, s16 tug, u16 cells)
 {
@@ -236,19 +269,13 @@ void hudSubGauge(const char* name, u16 gate, s16 a0, s16 alen, s16 d0, s16 dlen,
         row[k] = TILE_ATTR_FULL(PAL3, TRUE, FALSE, FALSE, HUD_BASE + t);
     }
     VDP_setTileMapDataRow(BG_A, row, 10, (40 - cells) / 2, cells, CPU);
-    /* jauge de la porte : ECHAPPE <----|----> TAPE */
-    idx = (tug + 100) * 20 / 200;
-    if (idx < 0) idx = 0;
-    if (idx > 20) idx = 20;
-    b[0] = 0;
-    scat(b, "ECHAPPE ", 40);
-    for (k = 0; k < 21; k++)
-    {
-        char c[2] = { ((s16)k == idx) ? '*' : (k == 10 ? '|' : '-'), 0 };
-        scat(b, c, 40);
-    }
-    scat(b, " TAPE", 40);
-    wtxtC(b, 11);
+    /* jauge de la porte : ECHAPPE [=====|=====] TAPE, tuiles dessinees a la volee */
+    buildTug(tug);
+    for (k = 0; k < TUG_TILES; k++)
+        row[k] = TILE_ATTR_FULL(PAL3, TRUE, FALSE, FALSE, TUG_BASE + k);
+    VDP_setTileMapDataRow(BG_A, row, 11, 10, TUG_TILES, CPU);
+    wtxt("ECHAPPE", 2, 11);
+    wtxt("TAPE", 31, 11);
 }
 
 void hudSubClear(void)
