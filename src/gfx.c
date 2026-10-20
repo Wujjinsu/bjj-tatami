@@ -132,7 +132,8 @@ void drawPortrait(u16 who, u16 gid, u16 x, u16 y, u16 tileBase)
 }
 
 /* ------------------------------------------------------------------ teintes de combat */
-static u16 tintBuf[16];
+static u16 tintFighter[2][16];
+static u16 tintStage[16];
 static s16 flashT;
 
 static u16 tintColor(u16 c, u16 mode)
@@ -155,10 +156,13 @@ void fighterTint(u16 who, u16 mode)
     u16 i, base = 16 + who * 16;
     if (palHold || tintNow[who] == mode) return;
     tintNow[who] = mode;
-    tintBuf[0] = 0;
-    for (i = 1; i < 16; i++) tintBuf[i] = mode ? tintColor(curPal[base + i], mode) : curPal[base + i];
-    if (mode == 2) tintBuf[1] = curPal[base + 1];      /* garde le contour */
-    PAL_setColors(base, tintBuf, 16, DMA_QUEUE);
+    {
+        u16* buf = tintFighter[who];        /* un tampon par palette : le DMA lit en fin d'image */
+        buf[0] = 0;
+        for (i = 1; i < 16; i++) buf[i] = mode ? tintColor(curPal[base + i], mode) : curPal[base + i];
+        if (mode == 2) buf[1] = curPal[base + 1];      /* garde le contour */
+        PAL_setColors(base, buf, 16, DMA_QUEUE);
+    }
 }
 
 /* decor assombri pendant une super technique */
@@ -166,8 +170,8 @@ void stageDim(bool on)
 {
     u16 i;
     if (palHold) return;
-    for (i = 0; i < 16; i++) tintBuf[i] = on ? tintColor(curPal[i], 4) : curPal[i];
-    PAL_setColors(0, tintBuf, 16, DMA_QUEUE);
+    for (i = 0; i < 16; i++) tintStage[i] = on ? tintColor(curPal[i], 4) : curPal[i];
+    PAL_setColors(0, tintStage, 16, DMA_QUEUE);
 }
 
 /* eclair blanc sur le decor (quelques images) */
@@ -175,12 +179,37 @@ void gfxFlash(u16 frames)
 {
     u16 i;
     if (palHold) return;
-    for (i = 0; i < 16; i++) tintBuf[i] = tintColor(curPal[i], 1);
-    PAL_setColors(0, tintBuf, 16, DMA_QUEUE);
+    for (i = 0; i < 16; i++) tintStage[i] = tintColor(curPal[i], 1);
+    PAL_setColors(0, tintStage, 16, DMA_QUEUE);
     flashT = frames;
 }
 
 void gfxUpdate(void)
 {
     if (flashT > 0 && --flashT == 0 && !palHold) PAL_setColors(0, curPal, 16, DMA_QUEUE);
+}
+
+/* portrait opaque (fond = couleur de contour) pour la cinematique de super technique */
+static u32 cutBuf[72 * 8];
+
+void drawPortraitOpaque(u16 who, u16 gid, u16 x, u16 y, u16 tileBase)
+{
+    const Image* img = portraits[gid];
+    const u32* src = img->tileset->tiles;
+    u16 n = img->tileset->numTile, k, b;
+    if (n > 72) n = 72;
+    for (k = 0; k < n * 8; k++)
+    {
+        u32 v = src[k], o = 0;
+        for (b = 0; b < 8; b++)
+        {
+            u32 nib = (v >> (b * 4)) & 15;
+            if (!nib) nib = 1;
+            o |= nib << (b * 4);
+        }
+        cutBuf[k] = o;
+    }
+    VDP_loadTileData(cutBuf, tileBase, n, DMA);
+    VDP_setTileMapEx(BG_A, img->tilemap, TILE_ATTR_FULL(who ? PAL2 : PAL1, TRUE, FALSE, FALSE, tileBase),
+                     x, y, 0, 0, img->tilemap->w, img->tilemap->h, CPU);
 }

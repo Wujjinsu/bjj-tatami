@@ -156,6 +156,7 @@ void setPalette(u16 index, const u16* cols, u16 n);
 void buildFighterPalette(u16* pal, const FighterDef* f, u8 gi);
 void applyFighterPalettes(void);
 void drawPortrait(u16 who, u16 gid, u16 x, u16 y, u16 tileBase);
+void drawPortraitOpaque(u16 who, u16 gid, u16 x, u16 y, u16 tileBase);
 void fadeOut(u16 frames);
 void fighterTint(u16 who, u16 mode);     /* 0 normal, 1 eclairci (attaque qui arrive), 2 blanc (choc), 3 dore (super) */
 void stageDim(bool on);

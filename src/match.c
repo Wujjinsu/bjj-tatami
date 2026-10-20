@@ -1284,11 +1284,11 @@ static void drawCutIn(u16 row)
     else fillPanel(0, row, 40, 1);
     if (row == 22)
     {
-        drawPortrait(i, P[i].gid, 3, 14, PORTRAIT_TILE);
+        drawPortraitOpaque(i, P[i].gid, 3, 14, PORTRAIT_TILE);
         gtxt("TECHNIQUE SPECIALE !", 14, 15);
         wtxt(sigName[P[i].def->special], 14, 17);
         gtxt(P[i].def->name, 14, 19);
-        wtxt(P[i].def->nick, 14, 20);
+        wtxt(P[i].def->nick, 14, 21);
     }
 }
 
