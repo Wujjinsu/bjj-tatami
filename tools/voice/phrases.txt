@@ -16,3 +16,5 @@ final|Grande final!
 pronto|Pronto?
 lutem|Lutem!
 perfeito|Perfeito!
+contra|Contra-ataque!
+especial|Golpe especial!
