@@ -153,16 +153,16 @@ static const char* const diffName[3] = { "FACILE", "NORMAL", "DIFFICILE" };
 /* rappel des touches du style de manette choisi */
 static void optionsPadHelp(void)
 {
-    clearRows(23, 26);
+    clearRows(21, 26);
     if (padStyle == PAD_XBOX)
     {
-        wtxtC("XBOX : A ATTAQUE  X PRISES  B DEFENSE", 23);
+        wtxtC("XBOX : A ATTAQUE  X PRISES  B DEFENSE", 22);
         wtxtC("Y (OU LB / RB) : SUPER TECHNIQUE", 24);
-        wtxtC("RETROARCH : PAD MD 6 BOUTONS POUR Y", 25);
+        gtxtC("RETROARCH : PAD MD 6 BOUTONS POUR Y", 26);
     }
     else
     {
-        wtxtC("MD : A ATTAQUE  B PRISES  C DEFENSE", 23);
+        wtxtC("MD : A ATTAQUE  B PRISES  C DEFENSE", 22);
         wtxtC("B+C : SUPER TECHNIQUE", 24);
     }
 }
@@ -171,7 +171,7 @@ static void optionsDraw(void)
 {
     char b[41];
     u16 i;
-    clearRows(8, 22);
+    clearRows(8, 20);
     for (i = 0; i < 6; i++)
     {
         b[0] = 0;
