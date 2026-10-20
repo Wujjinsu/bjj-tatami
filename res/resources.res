@@ -49,3 +49,23 @@ IMAGE   portrait_23    "portraits/portrait_23.png" NONE ALL
 IMAGE   portrait_24    "portraits/portrait_24.png" NONE ALL
 IMAGE   portrait_25    "portraits/portrait_25.png" NONE ALL
 IMAGE   portrait_26    "portraits/portrait_26.png" NONE ALL
+
+# voix de l'arbitre (tools/voice : synthese pt-BR + traitement)
+WAV     vo_oss              "voice/oss.wav"              PCM4
+WAV     vo_combate          "voice/combate.wav"          PCM4
+WAV     vo_finalizou        "voice/finalizou.wav"        PCM4
+WAV     vo_tempo            "voice/tempo.wav"            PCM4
+WAV     vo_vitoria          "voice/vitoria.wav"          PCM4
+WAV     vo_empate           "voice/empate.wav"           PCM4
+WAV     vo_desclassificado  "voice/desclassificado.wav"  PCM4
+WAV     vo_perfeito         "voice/perfeito.wav"         PCM4
+WAV     vo_campeao          "voice/campeao.wav"          PCM4
+WAV     vo_final            "voice/final.wav"            PCM4
+WAV     vo_pronto           "voice/pronto.wav"           PCM4
+WAV     vo_parou            "voice/parou.wav"            PCM4
+WAV     vo_pontos2          "voice/pontos2.wav"          PCM4
+WAV     vo_pontos3          "voice/pontos3.wav"          PCM4
+WAV     vo_pontos4          "voice/pontos4.wav"          PCM4
+WAV     vo_vantagem         "voice/vantagem.wav"         PCM4
+WAV     vo_punicao          "voice/punicao.wav"          PCM4
+WAV     vo_lutem            "voice/lutem.wav"            PCM4

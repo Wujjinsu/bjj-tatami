@@ -62,6 +62,7 @@ void fxBanner(u16 ban, u16 frames)
     SPR_setVisibility(banner, VISIBLE);
     banTimer = frames;
     banTick = 0;
+    voiceSay(ban);
 }
 
 bool fxBannerActive(void) { return banTimer > 0; }

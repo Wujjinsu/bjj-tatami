@@ -227,6 +227,9 @@ void crowdStart(void);
 void crowdStop(void);
 void crowdReact(bool big);
 void crowdUpdate(bool tense);
+/* voix de l'arbitre (meme ordre que les bannieres BAN_*, puis les annonces de points) */
+enum { VO_OSS, VO_COMBATE, VO_FINALIZOU, VO_TEMPO, VO_VITORIA, VO_EMPATE, VO_DESCLASSIFICADO, VO_PERFEITO, VO_CAMPEAO, VO_FINAL, VO_PRONTO, VO_PAROU, VO_P2, VO_P3, VO_P4, VO_VANTAGEM, VO_PUNICAO, VO_LUTEM, VO_COUNT };
+void voiceSay(u16 v);
 extern const u16 tuneWin[6];
 extern const u16 tuneLose[4];
 extern const u16 tuneStart[3];

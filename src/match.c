@@ -177,6 +177,7 @@ static void award(u16 who, u16 pts, u16 adv)
         headPos(who, &x, &y);
         popAt(who, pts == 2 ? POP_P2 : (pts == 3 ? POP_P3 : POP_P4));
         refSignal(REF_POINTS, x, 70);
+        voiceSay(pts == 2 ? VO_P2 : (pts == 3 ? VO_P3 : VO_P4));
         crowdReact(FALSE);
         stageCheer(120);
     }
@@ -186,6 +187,7 @@ static void award(u16 who, u16 pts, u16 adv)
         headPos(who, &x, &y);
         popAt(who, POP_AV);
         refSignal(REF_ADV, x, 60);
+        voiceSay(VO_VANTAGEM);
     }
 }
 
@@ -199,6 +201,7 @@ static void penalty(u16 i, const char* why)
     headPos(i, &x, &y);
     popAt(i, POP_PEN);
     refSignal(REF_PEN, x, 80);
+    voiceSay(VO_PUNICAO);
     hudMessageWho(i, why, 0);
     sfx(200, 14);
     if (P[i].pen == 2) P[OPP(i)].adv++;
@@ -602,6 +605,7 @@ static void resolveShoot(u16 att)
         P[att].points += 2;
         popAt(att, POP_P2);
         refSignal(REF_POINTS, P[att].x, 80);
+        voiceSay(VO_P2);
         nextPos = (type == TD_DOUBLE) ? POS_GUARD : (type == TD_SINGLE ? POS_HALF : POS_SIDE);
         playSeq(seqOk, att, FALSE, NX_GROUND);
     }
@@ -1076,7 +1080,8 @@ void match_enter(void)
     actorsPairStart(SEQ_SHAKE, anchor, flip, 1, FALSE);
     phase = PH_ANIM;
     next = NX_FIGHT;
-    fxBanner(BAN_OSS, 80);
+    /* la finale du championnat est annoncee */
+    fxBanner((gameType == GAME_ARCADE && ladderPos == LADDER_LEN - 1) ? BAN_FINAL : BAN_OSS, 80);
     stageCheer(120);
     if (gameType == GAME_DEMO) wtxtC("DEMO - APPUIE SUR START", 27);
     actorsDraw();

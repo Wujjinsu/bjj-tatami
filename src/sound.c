@@ -1,5 +1,5 @@
 /*
- * Son : bruitages PSG, musique de titre (PCM), public (PCM4).
+ * Son : bruitages PSG, musique de titre (PCM), public et voix de l'arbitre (PCM4).
  */
 #include "game.h"
 
@@ -123,13 +123,28 @@ void crowdReact(bool big)
     crowdBoost = big ? 240 : 90;
 }
 
+/* ------------------------------------------------------------------ voix de l'arbitre (PCM4, canal 3) */
+static const u8* const voiceData[VO_COUNT] = { vo_oss, vo_combate, vo_finalizou, vo_tempo, vo_vitoria, vo_empate, vo_desclassificado, vo_perfeito, vo_campeao, vo_final, vo_pronto, vo_parou, vo_pontos2, vo_pontos3, vo_pontos4, vo_vantagem, vo_punicao, vo_lutem };
+static const u16 voiceSize[VO_COUNT] = { sizeof(vo_oss), sizeof(vo_combate), sizeof(vo_finalizou), sizeof(vo_tempo), sizeof(vo_vitoria), sizeof(vo_empate), sizeof(vo_desclassificado), sizeof(vo_perfeito), sizeof(vo_campeao), sizeof(vo_final), sizeof(vo_pronto), sizeof(vo_parou), sizeof(vo_pontos2), sizeof(vo_pontos3), sizeof(vo_pontos4), sizeof(vo_vantagem), sizeof(vo_punicao), sizeof(vo_lutem) };
+static s16 voiceTimer;
+
+void voiceSay(u16 v)
+{
+    if (v >= VO_COUNT) return;
+    SND_PCM4_startPlay(voiceData[v], voiceSize[v], SOUND_PCM_CH3, FALSE);
+    SND_PCM4_setVolume(SOUND_PCM_CH3, 15);
+    voiceTimer = voiceSize[v] / 267 + 4;    /* 16 kHz = ~267 octets par image */
+}
+
 void crowdUpdate(bool tense)
 {
     u8 v = 6;
+    if (voiceTimer > 0) voiceTimer--;
     if (!crowdOn) return;
     if (crowdBoost > 0) crowdBoost--;
     if (tense) v += 3;
     if (crowdBoost > 0) v += 4;
+    if (voiceTimer > 0) v = (v > 9) ? v - 5 : 4;   /* le public se tait un peu quand l'arbitre parle */
     if (v > 15) v = 15;
     if (v != crowdVol)
     {

@@ -721,6 +721,7 @@ void ending_enter(void)
 {
     char b[41], n[8];
     gameMode = MODE_ENDING;
+    voiceSay(VO_CAMPEAO);
     enterScreen(&bg_menu);
     applyFighterPalettes();
     drawPortrait(0, fighterSel[0], 16, 3, screenTilesEnd());
