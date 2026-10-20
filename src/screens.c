@@ -449,8 +449,8 @@ void result_enter(void)
     b[n] = 0;
     txtCenter(b, 13, TXT_DARK);
 
-    if (numHumans == 0) txtCenter("DEMO", 24, TXT_WHITE);
-    else txtCenter("A : REVANCHE    START : MENU", 24, TXT_WHITE);
+    if (numHumans == 0) txtCenter("DEMO", 16, TXT_WHITE);
+    else txtCenter("A : REVANCHE    START : MENU", 16, TXT_WHITE);
     rTimer = 0;
 }
 
