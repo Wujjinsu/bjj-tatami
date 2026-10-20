@@ -150,12 +150,29 @@ void title_update(void)
 /* ==================================================================== OPTIONS */
 static const char* const diffName[3] = { "FACILE", "NORMAL", "DIFFICILE" };
 
+/* rappel des touches du style de manette choisi */
+static void optionsPadHelp(void)
+{
+    clearRows(23, 26);
+    if (padStyle == PAD_XBOX)
+    {
+        wtxtC("XBOX : A ATTAQUE  X PRISES  B DEFENSE", 23);
+        wtxtC("Y (OU LB / RB) : SUPER TECHNIQUE", 24);
+        wtxtC("RETROARCH : PAD MD 6 BOUTONS POUR Y", 25);
+    }
+    else
+    {
+        wtxtC("MD : A ATTAQUE  B PRISES  C DEFENSE", 23);
+        wtxtC("B+C : SUPER TECHNIQUE", 24);
+    }
+}
+
 static void optionsDraw(void)
 {
     char b[41];
     u16 i;
-    clearRows(8, 18);
-    for (i = 0; i < 5; i++)
+    clearRows(8, 22);
+    for (i = 0; i < 6; i++)
     {
         b[0] = 0;
         switch (i)
@@ -164,7 +181,8 @@ static void optionsDraw(void)
             case 1: scat(b, "NIVEAU : < ", 40); scat(b, diffName[difficulty], 40); scat(b, " >", 40); break;
             case 2: { char n[2] = { '0' + matchMinutes, 0 }; scat(b, "DUREE DU COMBAT : < ", 40); scat(b, n, 40); scat(b, " MIN >", 40); } break;
             case 3: scat(b, "AIDE A L'ECRAN : < ", 40); scat(b, helpOn ? "OUI" : "NON", 40); scat(b, " >", 40); break;
-            case 4: scat(b, "RETOUR", 40); break;
+            case 4: scat(b, "MANETTE : < ", 40); scat(b, padStyle == PAD_XBOX ? "XBOX" : "MEGA DRIVE", 40); scat(b, " >", 40); break;
+            case 5: scat(b, "RETOUR", 40); break;
         }
         if (i == cursor) { gtxt(">", 5, 9 + i * 2); gtxt(b, 7, 9 + i * 2); }
         else wtxt(b, 7, 9 + i * 2);
@@ -178,14 +196,15 @@ void options_enter(void)
     gtxtC("OPTIONS", 4);
     cursor = 0;
     optionsDraw();
+    optionsPadHelp();
     fadeInScreen(12);
 }
 
 void options_update(void)
 {
     bool l = mpressed(BUTTON_LEFT), r = mpressed(BUTTON_RIGHT);
-    if (mpressed(BUTTON_UP)) { cursor = (cursor + 4) % 5; sfx(600, 3); optionsDraw(); }
-    else if (mpressed(BUTTON_DOWN)) { cursor = (cursor + 1) % 5; sfx(600, 3); optionsDraw(); }
+    if (mpressed(BUTTON_UP)) { cursor = (cursor + 5) % 6; sfx(600, 3); optionsDraw(); }
+    else if (mpressed(BUTTON_DOWN)) { cursor = (cursor + 1) % 6; sfx(600, 3); optionsDraw(); }
     else if (l || r)
     {
         if (cursor == 1) { if (r && difficulty < 2) difficulty++; if (l && difficulty > 0) difficulty--; }
@@ -198,13 +217,14 @@ void options_update(void)
             matchMinutes = mins[k];
         }
         if (cursor == 3) helpOn = !helpOn;
+        if (cursor == 4) { padStyle = (padStyle == PAD_XBOX) ? PAD_MD : PAD_XBOX; optionsPadHelp(); }
         sfx(600, 3);
         optionsDraw();
     }
     else if (mpressed(BUTTON_A) || mpressed(BUTTON_START))
     {
         if (cursor == 0) { name_enter(); return; }
-        if (cursor == 4 || mpressed(BUTTON_START)) { saveWrite(); title_enter(); }
+        if (cursor == 5 || mpressed(BUTTON_START)) { saveWrite(); title_enter(); }
     }
     else if (mpressed(BUTTON_B)) { saveWrite(); title_enter(); }
 }
@@ -472,7 +492,7 @@ void select_update(void)
         /* 2 joueurs : manette 2 ; combat libre : manette 1 */
         u16 joy = (gameType == GAME_VERSUS) ? JOY_2 : JOY_1;
         static u16 prev2;
-        u16 pad = JOY_readJoypad(joy);
+        u16 pad = padMenu(JOY_readJoypad(joy));
         u16 pr = pad & ~prev2;
         prev2 = pad;
         btn = pr & (BUTTON_LEFT | BUTTON_RIGHT | BUTTON_UP | BUTTON_DOWN);

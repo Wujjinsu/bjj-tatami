@@ -172,7 +172,7 @@ static void gainSuper(u16 i, s16 n)
     if (P[i].superG > 100) P[i].superG = 100;
     if (!was && P[i].superG >= 100)
     {
-        hudMessageWho(i, "SUPER PRETE : B+C !", 0);
+        hudMessageWho(i, padStyle == PAD_XBOX ? "SUPER PRETE : Y !" : "SUPER PRETE : B+C !", 0);
         sfx(1568, 12);
     }
 }
@@ -267,6 +267,7 @@ static void acted(u16 i)
 static bool superPressed(u16 i)
 {
     if (P[i].superG < 100) return FALSE;
+    if (pressed(i, BUTTON_X | BUTTON_Y | BUTTON_Z)) return TRUE;        /* Xbox Y / LB / RB (pad 6 boutons) */
     return (pressed(i, BUTTON_B) && held(i, BUTTON_C)) || (pressed(i, BUTTON_C) && held(i, BUTTON_B));
 }
 
@@ -277,8 +278,12 @@ static void standHints(void)
         "@A DOUBLE-LEG ^@A JUDO  v@A SINGLE-LEG",
         "@B TENIR = PRISES    v@B TIRER LA GARDE",
         "@C CONTRER L'ICONE   @B+@C SUPER (PLEINE)" };
+    static const char* const hx[3] = {
+        "@A DOUBLE-LEG ^@A JUDO  v@A SINGLE-LEG",
+        "@B TENIR = PRISES    v@B TIRER LA GARDE",
+        "@C CONTRER L'ICONE   @Y SUPER (PLEINE)" };
     if (!helpOn || !P[0].human || numHumans != 1) { hudClearHints(); return; }
-    hudHints(h, 3);
+    hudHints(padStyle == PAD_XBOX ? hx : h, 3);
 }
 
 static const Move* moveFor(u16 who, u16 d)
@@ -640,7 +645,7 @@ static void startAttack(u16 i, u16 type)
     Player* f = &P[i];
     if (type == TD_JUDO && (f->grip < 40 || dist() > REACH_GRIP))
     {
-        hudMessageWho(i, "JUDO : IL FAUT DES PRISES (B)", 0);
+        hudMessageWho(i, padStyle == PAD_XBOX ? "JUDO : IL FAUT DES PRISES (X)" : "JUDO : IL FAUT DES PRISES (B)", 0);
         f->cooldown = 20;
         return;
     }
@@ -725,7 +730,7 @@ static void landTakedown(u16 a)
 static void tryPullGuard(u16 i)
 {
     if (dist() > REACH_GRIP) return;
-    if (P[i].grip < 25) { hudMessageWho(i, "IL FAUT DES PRISES (B)", 0); P[i].cooldown = 15; return; }
+    if (P[i].grip < 25) { hudMessageWho(i, padStyle == PAD_XBOX ? "IL FAUT DES PRISES (X)" : "IL FAUT DES PRISES (B)", 0); P[i].cooldown = 15; return; }
     acted(i);
     hudMessageWho(i, "TIRE LA GARDE", 0);
     setupStandingPair(i, SEQ_PULL_GUARD, FALSE);

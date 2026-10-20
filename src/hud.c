@@ -168,7 +168,12 @@ void hudDraw(s32 framesLeft, bool full)
                     if (fullG) t = ((frameCount >> 3) & 1) ? HT_SUB_BOTH : HT_SUB_ATT;
                     putTile(x, 4, t);
                 }
-                if (fullG)
+                if (fullG && padStyle == PAD_XBOX)
+                {
+                    putTile(p == 0 ? 15 : 24, 4, HT_XB_Y);
+                    VDP_setTileMapXY(BG_A, 0, p == 0 ? 16 : 23, 4);
+                }
+                else if (fullG)
                 {
                     putTile(p == 0 ? 15 : 23, 4, HT_BTN_B);
                     putTile(p == 0 ? 16 : 24, 4, HT_BTN_C);
@@ -231,7 +236,7 @@ void hudHints(const char* const* lines, u16 n)
             if (*s == '@' && s[1])
             {
                 if (k) { seg[k] = 0; wtxt(seg, x - k, 25 + i); k = 0; }
-                putTile(x, 25 + i, s[1] == 'A' ? HT_BTN_A : (s[1] == 'B' ? HT_BTN_B : HT_BTN_C));
+                putTile(x, 25 + i, iconTile(s[1]));
                 x++;
                 s += 2;
                 continue;

@@ -184,16 +184,17 @@ def flag(code):
 FLAGS = ["BRA", "JPN", "FRA", "SEN", "UKR", "ITA", "ALG", "HUN", "POR", "LBN", "CAN", "NOR", "MLI", "POL"]
 
 
-def button_icon(letter, color):
+def button_icon(letter, color, ink=WH):
     a = np.zeros((8, 8), np.uint8)
     yy, xx = np.mgrid[0:8, 0:8]
     a[((yy - 3.5) ** 2 + (xx - 3.5) ** 2) <= 14] = K
     a[((yy - 3.5) ** 2 + (xx - 3.5) ** 2) <= 9] = color
-    g = {"A": ["##.", "#.#", "###", "#.#"], "B": ["##.", "###", "#.#", "##."], "C": [".##", "#..", "#..", ".##"]}[letter]
+    g = {"A": ["##.", "#.#", "###", "#.#"], "B": ["##.", "###", "#.#", "##."], "C": [".##", "#..", "#..", ".##"],
+         "X": ["#.#", ".#.", ".#.", "#.#"], "Y": ["#.#", "#.#", ".#.", ".#."]}[letter]
     for y, l in enumerate(g):
         for x, c in enumerate(l):
             if c == "#":
-                a[2 + y, 2 + x] = WH
+                a[2 + y, 2 + x] = ink
     return a
 
 
@@ -228,6 +229,10 @@ def build_hud():
     T.add("btn_a", button_icon("A", DR))
     T.add("btn_b", button_icon("B", DBL))
     T.add("btn_c", button_icon("C", DGR))
+    T.add("xb_a", button_icon("A", GR))
+    T.add("xb_b", button_icon("B", RD))
+    T.add("xb_x", button_icon("X", BL))
+    T.add("xb_y", button_icon("Y", YE, K))
     # mini-jeu de soumission : cases de la barre et cadenas des portes
     def cell(fill, top, edge=K):
         a = np.full((8, 8), NV, np.uint8)
@@ -376,15 +381,15 @@ PROMPTS = ["C_UP", "C_SIDE", "C_DOWN", "C", "A_MASH", "C_MASH", "UP", "DOWN", "L
 BTN_COL = {"A": RD, "B": YE, "C": BL}
 
 
-def big_button(letter):
+def big_button(letter, col=None):
     """bouton rond 16x16 avec grosse lettre."""
     a = np.zeros((16, 16), np.uint8)
     yy, xx = np.mgrid[0:16, 0:16]
     r = (yy - 7.5) ** 2 + (xx - 7.5) ** 2
-    col = BTN_COL[letter]
+    col = col if col is not None else BTN_COL[letter]
     a[r <= 62] = K
     a[r <= 48] = col
-    a[(r <= 48) & (yy >= 11)] = {RD: DR, YE: OR, BL: DBL}[col]
+    a[(r <= 48) & (yy >= 11)] = {RD: DR, YE: OR, BL: DBL, GR: DGR}[col]
     fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
     tmp = Image.new("L", (16, 16), 0)
     d = ImageDraw.Draw(tmp)
@@ -395,7 +400,7 @@ def big_button(letter):
     sh = np.zeros_like(m)
     sh[1:, 1:] = m[:-1, :-1]
     a[sh & (r <= 48)] = K
-    a[m] = K if letter == "B" else WH
+    a[m] = K if col == YE else WH
     return a
 
 
@@ -439,26 +444,32 @@ def mash(letter):
 
 
 def build_prompts():
+    """deux jeux d'invites : manette Mega Drive (A B C) puis manette Xbox (A vert, B rouge, Y jaune)."""
+    styles = [{"DEF": ("C", BL), "ATK": ("A", RD), "SUP": [("B", YE), ("C", BL)]},
+              {"DEF": ("B", RD), "ATK": ("A", GR), "SUP": [("Y", YE)]}]
     cells = []
-    for p in PROMPTS:
-        c = np.zeros((16, 32), np.uint8)
-        if p.startswith("C_") and p != "C_MASH":
-            c[:, 0:16] = big_button("C")
-            c[:, 16:32] = arrow(p[2:])
-        elif p == "C":
-            c[:, 8:24] = big_button("C")
-        elif p.endswith("_MASH"):
-            c[:, 0:16] = big_button(p[0])
-            # traits de vitesse : "appuie vite"
-            for k in range(3):
-                c[3 + k * 4:5 + k * 4, 18:30 - k * 3] = YE
-                c[5 + k * 4, 18:30 - k * 3] = K
-        elif p == "BC":
-            c[:, 0:16] = big_button("B")
-            c[:, 16:32] = big_button("C")
-        else:
-            c[:, 8:24] = arrow(p)
-        cells.append(c)
+    for st in styles:
+        for p in PROMPTS:
+            c = np.zeros((16, 32), np.uint8)
+            if p.startswith("C_") and p != "C_MASH":
+                c[:, 0:16] = big_button(*st["DEF"])
+                c[:, 16:32] = arrow(p[2:])
+            elif p == "C":
+                c[:, 8:24] = big_button(*st["DEF"])
+            elif p.endswith("_MASH"):
+                c[:, 0:16] = big_button(*(st["ATK"] if p[0] == "A" else st["DEF"]))
+                for k in range(3):
+                    c[3 + k * 4:5 + k * 4, 18:30 - k * 3] = YE
+                    c[5 + k * 4, 18:30 - k * 3] = K
+            elif p == "BC":
+                if len(st["SUP"]) == 2:
+                    c[:, 0:16] = big_button(*st["SUP"][0])
+                    c[:, 16:32] = big_button(*st["SUP"][1])
+                else:
+                    c[:, 8:24] = big_button(*st["SUP"][0])
+            else:
+                c[:, 8:24] = arrow(p)
+            cells.append(c)
     return np.concatenate(cells, axis=1)
 
 

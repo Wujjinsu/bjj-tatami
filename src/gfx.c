@@ -33,6 +33,9 @@ void gfxInit(void)
     u16 i;
     for (i = 0; i < 64; i++) curPal[i] = 0;
     VDP_setScreenWidth320();
+    /* pad 6 boutons accepte (X Y Z = super technique ; Xbox Y / LB / RB sous RetroArch) */
+    JOY_setSupport(PORT_1, JOY_SUPPORT_6BTN);
+    JOY_setSupport(PORT_2, JOY_SUPPORT_6BTN);
     VDP_setPlaneSize(64, 32, TRUE);
     SPR_initEx(SPR_VRAM);
     VDP_loadFont(&font_gold, DMA);

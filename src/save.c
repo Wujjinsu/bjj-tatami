@@ -63,7 +63,8 @@ void saveLoad(void)
     difficulty = rd(OFS_OPT) % 3;
     matchMinutes = rd(OFS_OPT + 1);
     if (matchMinutes < 2 || matchMinutes > 5) matchMinutes = 3;
-    helpOn = rd(OFS_OPT + 2) != 0;
+    helpOn = (rd(OFS_OPT + 2) & 1) != 0;
+    padStyle = (rd(OFS_OPT + 2) & 2) ? PAD_MD : PAD_XBOX;
     stats.matches = rd16(OFS_STATS);
     stats.wins = rd16(OFS_STATS + 2);
     stats.subs = rd16(OFS_STATS + 4);
@@ -94,7 +95,7 @@ void saveWrite(void)
     for (i = 0; i < NAME_LEN; i++) SRAM_writeByte(OFS_NAME + i, (i < slen(playerName)) ? playerName[i] : 0);
     SRAM_writeByte(OFS_OPT, difficulty);
     SRAM_writeByte(OFS_OPT + 1, matchMinutes);
-    SRAM_writeByte(OFS_OPT + 2, helpOn ? 1 : 0);
+    SRAM_writeByte(OFS_OPT + 2, (helpOn ? 1 : 0) | (padStyle == PAD_MD ? 2 : 0));
     wr16(OFS_STATS, stats.matches);
     wr16(OFS_STATS + 2, stats.wins);
     wr16(OFS_STATS + 4, stats.subs);

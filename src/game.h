@@ -8,7 +8,7 @@
 
 /* ------------------------------------------------------------------ VRAM (index de tuiles) */
 #define BG_BASE         TILE_USER_INDEX     /* decor de l'ecran courant (560 tuiles max) */
-#define HUD_BASE        576
+#define HUD_BASE        560
 #define WFONT_BASE      720                 /* police blanche (96 tuiles) */
 #define BAR_BASE        816                 /* jauges dynamiques (2 x 16 tuiles) */
 #define SLOT_BASE       848                 /* 3 emplacements de 64 tuiles pour les combattants */
@@ -223,6 +223,13 @@ void actorsShadows(bool show);
 void actorsDraw(void);
 
 /* ------------------------------------------------------------------ manettes */
+/* style de manette : 0 = Mega Drive (A B C), 1 = Xbox (A attaque, X prises, B defense, Y super) */
+#define PAD_MD      0
+#define PAD_XBOX    1
+extern u16 padStyle;
+u16  padMenu(u16 raw);
+u16  padGame(u16 raw);
+u16  iconTile(char role);           /* icone du bouton d'un role : 'A' attaque, 'B' prises, 'C' defense, 'Y' super */
 void readPads(void);
 bool pressed(u16 i, u16 b);
 bool held(u16 i, u16 b);

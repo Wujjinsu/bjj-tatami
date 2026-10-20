@@ -94,13 +94,52 @@ void fillPanel(u16 x, u16 y, u16 w, u16 h)
 }
 
 /* ------------------------------------------------------------------ manettes */
+u16 padStyle = PAD_XBOX;
+
+/*
+ * Avec RetroArch + Genesis Plus GX (reglages par defaut), une manette Xbox donne :
+ *   Xbox A -> MD B,  Xbox B -> MD C,  Xbox X -> MD A,  Xbox Y -> MD Y (pad 6 boutons), LB -> MD X, RB -> MD Z.
+ * On remet les boutons a leur place "Xbox" :
+ *   menus  : Xbox A = valider (A), Xbox B = retour (B)
+ *   combat : Xbox A = attaque (A), Xbox X = prises/soumission (B), Xbox B = defense (C), Y/LB/RB = super
+ */
+#define ABC (BUTTON_A | BUTTON_B | BUTTON_C)
+
+u16 padMenu(u16 raw)
+{
+    u16 o;
+    if (padStyle != PAD_XBOX) return raw;
+    o = raw & ~ABC;
+    if (raw & BUTTON_B) o |= BUTTON_A;
+    if (raw & BUTTON_C) o |= BUTTON_B;
+    if (raw & BUTTON_A) o |= BUTTON_C;
+    return o;
+}
+
+u16 padGame(u16 raw)
+{
+    u16 o;
+    if (padStyle != PAD_XBOX) return raw;
+    o = raw & ~ABC;
+    if (raw & BUTTON_B) o |= BUTTON_A;
+    if (raw & BUTTON_A) o |= BUTTON_B;
+    if (raw & BUTTON_C) o |= BUTTON_C;
+    return o;
+}
+
+u16 iconTile(char role)
+{
+    if (padStyle == PAD_XBOX)
+        return role == 'A' ? HT_XB_A : (role == 'B' ? HT_XB_X : (role == 'C' ? HT_XB_B : HT_XB_Y));
+    return role == 'A' ? HT_BTN_A : (role == 'B' ? HT_BTN_B : HT_BTN_C);
+}
 void readPads(void)
 {
     u16 i;
     for (i = 0; i < 2; i++)
     {
         P[i].prev = P[i].pad;
-        P[i].pad = P[i].human ? JOY_readJoypad(P[i].joy) : 0;
+        P[i].pad = P[i].human ? padGame(JOY_readJoypad(P[i].joy)) : 0;
     }
 }
 
@@ -112,7 +151,7 @@ static u16 mPad, mPrev;
 void readMenuPad(void)
 {
     mPrev = mPad;
-    mPad = JOY_readJoypad(JOY_1) | JOY_readJoypad(JOY_2);
+    mPad = padMenu(JOY_readJoypad(JOY_1) | JOY_readJoypad(JOY_2));
 }
 
 bool mpressed(u16 b) { return (mPad & b) && !(mPrev & b); }

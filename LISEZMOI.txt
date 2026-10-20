@@ -14,8 +14,22 @@ COMPILER (Windows)
   puis "make -f $GDK/makefile.gen" dans ce dossier.
 
 JOUER
-  RetroArch (coeur Genesis Plus GX ou PicoDrive) ou BlastEm.
-  Manette 3 boutons suffit.
+  RetroArch (coeur Genesis Plus GX conseille) ou BlastEm.
+
+MANETTE XBOX ONE (reglage par defaut, Options > MANETTE : XBOX)
+  Croix / stick gauche : se deplacer, choisir la direction des techniques
+  A : attaquer (amenees au sol, techniques au sol) - valider dans les menus
+  X : prises du kimono / soumissions
+  B : defense, contres - retour dans les menus
+  Y (ou LB / RB) : super technique quand la jauge est pleine
+  START : demarrer
+  Dans RetroArch, laisser les touches par defaut (Controles > Port 1 : RetroPad).
+  Pour Y/LB/RB : Menu rapide > Controles > Port 1 > Type de peripherique = MD Joypad 6 Button
+  (ou "auto" : la cartouche annonce le pad 6 boutons). Sans pad 6 boutons : X+B = super.
+
+MANETTE MEGA DRIVE / ECRAN TACTILE (Options > MANETTE : MEGA DRIVE)
+  A : attaquer   B : prises / soumissions   C : defense   B+C : super technique.
+  A choisir avec l'overlay tactile RetroArch (boutons A B C).
 
 MENU (ecran titre)
   START : menu. HAUT/BAS : choisir, GAUCHE/DROITE : changer, A : valider.
@@ -36,10 +50,10 @@ LE PRINCIPE (facon arcade)
   - Appuyer sur C pour rien = tu te decouvres un instant.
 
 DEBOUT
-  GAUCHE/DROITE : se deplacer       B tenu (pres de lui) : prendre les prises
+  GAUCHE/DROITE : se deplacer       prises tenues (X Xbox / B MD) pres de lui : prendre les prises
   A : double-leg   BAS+A : single-leg   HAUT+A : projection judo (il faut des prises)
   BAS+B : tirer la garde (il faut des prises)
-  Defense : C contre double et single-leg, HAUT+C contre le judo (l'icone te le dit).
+  Defense (B Xbox / C Mega Drive) contre double et single-leg, HAUT+defense contre le judo.
 
 AU SOL
   Les actions possibles s'affichent en bas : ^ = HAUT (ou rien), > = COTE, v = BAS.
@@ -49,12 +63,12 @@ AU SOL
   Defense : C + la fleche affichee au-dessus de ta tete.
 
 SOUMISSION : BRAS DE FER
-  L'attaquant martele A, le defenseur martele C. Jauge ECHAPPE <-> TAPE.
+  L'attaquant martele A, le defenseur martele la defense (B Xbox / C Mega Drive).
   Parfois une fleche apparait au-dessus d'un combattant : l'appuyer vite = gros bonus.
 
 SUPER TECHNIQUE
   La jauge sous les points se remplit avec les techniques et les contres.
-  Pleine (elle clignote, icones B C) : B+C ensemble = technique signature du combattant :
+  Pleine (elle clignote) : Y sur manette Xbox (B+C sur manette Mega Drive) = technique signature :
   cinematique, puis enchainement automatique jusqu'a sa soumission favorite.
 
 SOUFFLE ET CARDIO (barres sous les noms)

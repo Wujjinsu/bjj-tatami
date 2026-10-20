@@ -55,7 +55,7 @@ void fxPrompt(u16 slot, s16 pr, s16 wx, s16 wy)
 {
     if (!prompt[slot]) return;
     if (pr < 0) { SPR_setVisibility(prompt[slot], HIDDEN); return; }
-    SPR_setFrame(prompt[slot], pr);
+    SPR_setFrame(prompt[slot], pr + (padStyle == PAD_XBOX ? PR_COUNT : 0));
     SPR_setVisibility(prompt[slot], ((frameCount >> 2) & 3) == 3 ? HIDDEN : VISIBLE);
     SPR_setPosition(prompt[slot], wx - camX() - 16, wy - 18 - ((frameCount >> 2) & 1) * 2);
 }
