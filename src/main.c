@@ -153,6 +153,18 @@ static void message(const char* s)
     msgTimer = 120;
 }
 
+/* message precede de qui agit : "TOI : ..." ou "CPU : ..." */
+static void messageWho(u16 who, const char* s)
+{
+    char b[41];
+    const char* p = (who == P_PLAYER) ? "TOI : " : "CPU : ";
+    u16 n = 0;
+    while (*p && n < 40) b[n++] = *p++;
+    while (*s && n < 40) b[n++] = *s++;
+    b[n] = 0;
+    message(b);
+}
+
 /* nombre avec zeros devant (digits chiffres) */
 static void putNum(s16 v, u16 digits, u16 x, u16 y)
 {
@@ -516,21 +528,21 @@ static void struggleSuccess(void)
     {
         switch (pos)
         {
-            case POS_GUARD: pos = POS_HALF;  F[who].adv++;      message("GARDE OUVERTE ! AVANTAGE");  break;
-            case POS_HALF:  pos = POS_SIDE;  F[who].points += 3; message("PASSAGE DE GARDE ! +3");    break;
-            case POS_SIDE:  pos = POS_MOUNT; F[who].points += 4; message("MONTEE ! +4");              break;
-            case POS_MOUNT: pos = POS_BACK;  F[who].points += 4; message("PRISE DE DOS ! +4");        break;
+            case POS_GUARD: pos = POS_HALF;  F[who].adv++;      messageWho(who, "GARDE OUVERTE ! AVANTAGE");  break;
+            case POS_HALF:  pos = POS_SIDE;  F[who].points += 3; messageWho(who, "PASSAGE DE GARDE ! +3");    break;
+            case POS_SIDE:  pos = POS_MOUNT; F[who].points += 4; messageWho(who, "MONTEE ! +4");              break;
+            case POS_MOUNT: pos = POS_BACK;  F[who].points += 4; messageWho(who, "PRISE DE DOS ! +4");        break;
         }
     }
     else
     {
         switch (pos)
         {
-            case POS_GUARD: top = who; pos = POS_HALF; F[who].points += 2; message("BALAYAGE ! +2");  break;
-            case POS_HALF:  pos = POS_GUARD; message("GARDE RECUPEREE");                              break;
-            case POS_SIDE:  pos = POS_HALF;  message("SORTIE EN DEMI-GARDE");                         break;
-            case POS_MOUNT: top = who; pos = POS_GUARD; message("UPA ! RENVERSEMENT");                break;
-            case POS_BACK:  top = who; pos = POS_GUARD; message("IL SE RETOURNE DANS LA GARDE");      break;
+            case POS_GUARD: top = who; pos = POS_HALF; F[who].points += 2; messageWho(who, "BALAYAGE ! +2");  break;
+            case POS_HALF:  pos = POS_GUARD; messageWho(who, "GARDE RECUPEREE");                              break;
+            case POS_SIDE:  pos = POS_HALF;  messageWho(who, "SORTIE EN DEMI-GARDE");                         break;
+            case POS_MOUNT: top = who; pos = POS_GUARD; messageWho(who, "UPA ! RENVERSEMENT");                break;
+            case POS_BACK:  top = who; pos = POS_GUARD; messageWho(who, "SE RETOURNE DANS LA GARDE");      break;
         }
     }
     setGroundPalette();
@@ -591,7 +603,7 @@ static void updateStruggle(void)
         if (sGauge >= GAUGE_MAX / 2)
         {
             F[sWho].adv++;
-            message("PRESQUE ! AVANTAGE");
+            messageWho(sWho, "PRESQUE ! AVANTAGE");
         }
         else message("BLOQUE");
         struggleEnd();
@@ -665,13 +677,13 @@ static void resolveShoot(u16 att)
 
     if (dist() > REACH_SHOOT)
     {
-        message("TROP LOIN !");
+        messageWho(att, "TROP LOIN !");
         stumble(att, 16);
         return;
     }
     if (F[def].act == ACT_SPRAWL)
     {
-        message("SPRAWL ! PROJECTION BLOQUEE");
+        messageWho(def, "SPRAWL ! PROJECTION BLOQUEE");
         addStamina(att, -10);
         stumble(att, 30);
         sfx(150, 8);
@@ -686,12 +698,12 @@ static void resolveShoot(u16 att)
         F[att].points += 2;
         sfxSlam();
         crowdReact(FALSE);
-        message("QUEDA ! PROJECTION +2");
+        messageWho(att, "QUEDA ! PROJECTION +2");
         goGround(POS_GUARD, att);
     }
     else
     {
-        message("PROJECTION RATEE");
+        messageWho(att, "PROJECTION RATEE");
         stumble(att, 20);
     }
 }
