@@ -111,6 +111,7 @@ static const u16 cpuRead[3]    = { 65, 82, 94 };   /* % de bonne lecture quand e
 static const u16 cpuMash[3]    = { 11, 8, 6 };     /* images entre deux appuis (soumission) */
 static const u16 cpuDodge[3]   = { 35, 55, 75 };   /* % de reussite sur les fleches */
 static const u16 cpuFeint[3]   = { 0, 12, 28 };    /* % de feinte au sol */
+static const u16 cpuPerfect[3] = { 5, 12, 25 };    /* % de contres parfaits (au dernier moment) */
 
 /* ------------------------------------------------------------------ etat */
 static u16 phase;
@@ -220,8 +221,8 @@ static void award(u16 who, u16 pts, u16 adv)
         voiceSay(pts == 2 ? VO_P2 : (pts == 3 ? VO_P3 : VO_P4));
         crowdReact(FALSE);
         stageCheer(120);
-        gainSuper(who, pts * 4);
-        gainSuper(OPP(who), 6);
+        gainSuper(who, pts * 2);
+        gainSuper(OPP(who), 4);
     }
     else if (adv)
     {
@@ -625,10 +626,11 @@ static void aiPlanCounter(u16 d)
     {
         bool read = (random() % 100) < cpuRead[difficulty];
         u16 kind = (op->tdType == TD_JUDO) ? DEF_HIP : DEF_SPRAWL;
-        s16 span = op->windMax - 5;
+        s16 span = op->windMax - PERFECT_WIN - 4;
         if (!read) kind = 1 - kind;
         if (span < 1) span = 1;
         me->aiDenyAt = 4 + (random() % span);
+        if ((random() % 100) < cpuPerfect[difficulty]) me->aiDenyAt = op->windMax - 2 - (random() % 4);
         me->aiDenyBtn = BUTTON_C | (kind == DEF_HIP ? BUTTON_UP : 0);
     }
 }
@@ -682,8 +684,8 @@ static void counterStand(u16 d, bool perfect)
     P[a].stunNext = perfect ? 70 : 40;
     P[d].opening = perfect ? 150 : 80;
     P[d].idle = 0;
-    gainSuper(d, perfect ? 40 : 22);
-    gainSuper(a, 5);
+    gainSuper(d, perfect ? 22 : 10);
+    gainSuper(a, 3);
     if (perfect)
     {
         award(d, 0, 1);
@@ -715,7 +717,7 @@ static void landTakedown(u16 a)
     setupStandingPair(a, seq, type != TD_JUDO);
     hudMessageWho(a, tdName[type], 2);
     award(a, 2, 0);
-    gainSuper(a, 6);
+    gainSuper(a, 3);
     nextPos = (type == TD_DOUBLE) ? POS_GUARD : (type == TD_SINGLE ? POS_HALF : POS_SIDE);
     playSeq(seq, a, FALSE, NX_GROUND);
 }
@@ -895,10 +897,11 @@ static void planDeny(void)
         if ((random() % 100) < (u16)(cpuDeny[difficulty] + stat * 2))
         {
             u16 guess = pendDir;
-            s16 span = pendMax - 5;
+            s16 span = pendMax - PERFECT_WIN - 4;
             if ((random() % 100) >= cpuRead[difficulty]) guess = (pendDir + 1 + (random() & 1)) % 3;
             if (span < 1) span = 1;
             P[d].aiDenyAt = 4 + (random() % span);
+            if ((random() % 100) < cpuPerfect[difficulty]) P[d].aiDenyAt = pendMax - 2 - (random() % 4);
             P[d].aiDenyBtn = BUTTON_C | dirBtn(guess);
         }
     }
@@ -970,7 +973,7 @@ static void applyMove(u16 who, const Move* m)
     else if (m->adv) hudMessageWho(who, "AVANTAGE ! GARDE OUVERTE", 0);
     else hudMessageWho(who, m->name, 0);
     award(who, m->points, m->adv);
-    gainSuper(who, 8);
+    gainSuper(who, 3);
     playSeq(m->seq, top, FALSE, NX_GROUND);
 }
 
@@ -993,8 +996,8 @@ static void blocked(u16 d, bool perfect)
     groundCd[who] = perfect ? 70 : 45;
     groundCd[d] = 4;
     P[d].idle = 0;
-    gainSuper(d, perfect ? 38 : 20);
-    gainSuper(who, 4);
+    gainSuper(d, perfect ? 20 : 10);
+    gainSuper(who, 3);
     if (perfect)
     {
         P[d].opening = 120;
@@ -1232,7 +1235,7 @@ static void updateSub(void)
         if (subPeak >= 60) { P[a].adv++; hudMessageWho(d, "S'ECHAPPE ! (AVANTAGE)", 0); popAt(a, POP_AV); }
         else hudMessageWho(d, "S'ECHAPPE !", 0);
         spend(a, 20);
-        gainSuper(d, 25);
+        gainSuper(d, 15);
         sfx(160, 10);
         hudSubClear();
         groundCd[a] = 110;
@@ -1344,7 +1347,7 @@ static void comboStep(void)
     {
         comboOn = FALSE;
         hudMessage("FINITION !", 90);
-        startSub(w, best, 50);
+        startSub(w, best, 35);
         return;
     }
     if (comboSteps < 4)
@@ -1372,7 +1375,7 @@ static void comboStep(void)
     for (d = 0; d < 3; d++)
     {
         const SubMove* s = subFor(w, d);
-        if (s) { comboOn = FALSE; startSub(w, s, 50); return; }
+        if (s) { comboOn = FALSE; startSub(w, s, 35); return; }
     }
     comboOn = FALSE;
 }
