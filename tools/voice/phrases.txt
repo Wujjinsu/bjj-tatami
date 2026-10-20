@@ -15,3 +15,4 @@ campeao|Campeão!
 final|Grande final!
 pronto|Pronto?
 lutem|Lutem!
+perfeito|Perfeito!
