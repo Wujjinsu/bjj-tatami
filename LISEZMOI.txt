@@ -27,29 +27,40 @@ SELECTION
   HAUT/BAS : combattant (3 par categorie, chacun ses stats et sa specialite)
   Stats : GAR garde, PAS passage, LUT lutte, SOU soumission, CAR cardio.
 
+LE PRINCIPE (facon arcade)
+  Chaque attaque SE VOIT VENIR : l'attaquant clignote et une icone de bouton
+  apparait au-dessus de ta tete. Appuie sur le bouton montre AVANT que l'attaque parte.
+  - Contre normal : "BLOC", l'attaquant est sonne, tu gagnes une OUVERTURE.
+  - Contre au dernier moment : CONTRE PARFAIT ("CONTRA!") + avantage + ouverture longue.
+  - Ouverture (tu brilles en dore) : ta prochaine technique part tout de suite, imparable.
+  - Appuyer sur C pour rien = tu te decouvres un instant.
+
 DEBOUT
   GAUCHE/DROITE : se deplacer       B tenu (pres de lui) : prendre les prises
-  A : double-leg   HAUT+A : projection judo (il faut des prises)   BAS+A : single-leg
+  A : double-leg   BAS+A : single-leg   HAUT+A : projection judo (il faut des prises)
   BAS+B : tirer la garde (il faut des prises)
-  C : sprawl (contre double et single)   HAUT+C : bloquer la hanche (contre le judo)
+  Defense : C contre double et single-leg, HAUT+C contre le judo (l'icone te le dit).
 
-AU SOL (facon UFC)
-  Les actions possibles s'affichent en haut : ^ = HAUT (ou rien), > = COTE, v = BAS.
-  A + direction : transition (passer, monter, balayer, sortir, se relever...)
+AU SOL
+  Les actions possibles s'affichent en bas : ^ = HAUT (ou rien), > = COTE, v = BAS.
+  A + direction : technique (passer, monter, balayer, sortir, se relever...)
   B + direction : soumission
-  Quand l'adversaire lance "ATTAQUE !", tu ne sais pas laquelle : C + LA MEME
-  direction la bloque. Bien lire son adversaire, c'est tout le jeu.
+  FEINTE : pendant ta preparation, rappuie A ou B dans une autre direction.
+  Defense : C + la fleche affichee au-dessus de ta tete.
 
-SOUMISSION : 3 PORTES
-  Chacun deplace son curseur avec la croix.
-  Attaquant (=) : couvrir le curseur adverse pour remplir la porte.
-  Defenseur (#) : lui echapper. 3 portes gagnees = il tape. Une porte perdue = il s'echappe.
-  Rater une soumission coute du souffle et 2 secondes sans pouvoir agir.
+SOUMISSION : BRAS DE FER
+  L'attaquant martele A, le defenseur martele C. Jauge ECHAPPE <-> TAPE.
+  Parfois une fleche apparait au-dessus d'un combattant : l'appuyer vite = gros bonus.
+
+SUPER TECHNIQUE
+  La jauge sous les points se remplit avec les techniques et les contres.
+  Pleine (elle clignote, icones B C) : B+C ensemble = technique signature du combattant :
+  cinematique, puis enchainement automatique jusqu'a sa soumission favorite.
 
 SOUFFLE ET CARDIO (barres sous les noms)
-  # = souffle, - = cardio. Chaque effort coute du souffle ; il ne remonte jamais
-  au-dessus du cardio, qui baisse pendant le combat (moins vite si gros cardio).
-  Essouffle : projections plus faibles, curseur plus lent.
+  Chaque effort coute du souffle ; il ne remonte jamais au-dessus du cardio,
+  qui baisse pendant le combat (moins vite si gros cardio).
+  Essouffle : preparations plus lentes (plus faciles a contrer), soumissions plus faibles.
 
 REGLES
   Points IBJJF : projection 2, balayage 2, genou au ventre 2, passage 3, montee 4, dos 4.
