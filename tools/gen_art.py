@@ -25,12 +25,15 @@ SPRITE_PAL = [
     (18, 54, 144),   # 9 kimono B ombre
     (144, 54, 180),  # 10 ceinture B
     (216, 36, 36),   # 11 barrette rouge de la ceinture noire
-    (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0),
+    (198, 138, 90),  # 12 peau B (combattant du dessous)
+    (144, 90, 54),   # 13 peau B ombre
+    (18, 18, 18),    # 14 cheveux B
+    (0, 0, 0),       # 15 libre (couleur de texte)
 ]
 
 SKIN, SKIN_SH, HAIR, OUT = 2, 3, 4, 1
-GRP_A = dict(gi=5, sh=6, belt=7)
-GRP_B = dict(gi=8, sh=9, belt=10)
+GRP_A = dict(gi=5, sh=6, belt=7, skin=2, ssh=3, hair=4)
+GRP_B = dict(gi=8, sh=9, belt=10, skin=12, ssh=13, hair=14)
 
 
 def new_img(w, h, pal):
@@ -59,12 +62,12 @@ def draw_fig(d, J, g, parts=("back", "body", "front")):
         if "kneeB" in J:
             line(d, J["hip"], J["kneeB"], g["sh"], 5)
             line(d, J["kneeB"], J["footB"], g["sh"], 4)
-            d.ellipse([J["footB"][0] - 2, J["footB"][1] - 1, J["footB"][0] + 2, J["footB"][1] + 1], fill=SKIN_SH)
+            d.ellipse([J["footB"][0] - 2, J["footB"][1] - 1, J["footB"][0] + 2, J["footB"][1] + 1], fill=g["ssh"])
         if "elbowB" in J:
             line(d, J["neck"], J["elbowB"], g["sh"], 4)
             line(d, J["elbowB"], J["handB"], g["sh"], 3)
             h = J["handB"]
-            d.ellipse([h[0] - 2, h[1] - 2, h[0] + 2, h[1] + 2], fill=SKIN_SH)
+            d.ellipse([h[0] - 2, h[1] - 2, h[0] + 2, h[1] + 2], fill=g["ssh"])
     if "body" in parts:
         line(d, J["neck"], J["hip"], g["gi"], 9)
         # revers du kimono
@@ -72,26 +75,26 @@ def draw_fig(d, J, g, parts=("back", "body", "front")):
         # ceinture
         b0, b1 = lerp(J["hip"], J["neck"], 0.10), lerp(J["hip"], J["neck"], 0.18)
         d.line([b0, b1], fill=g["belt"], width=9)
-        if g["belt"] == 7:  # ceinture noire : barrette rouge
+        if True:  # ceinture noire : barrette rouge
             p = lerp(J["hip"], J["neck"], 0.14)
             d.point(p, fill=11)
         # tete : cheveux derriere, visage decale vers le regard
         hx, hy = J["head"]
         fx, fy = J.get("face", (1, 0))
-        d.ellipse([hx - 5, hy - 5, hx + 5, hy + 5], fill=HAIR)
-        d.ellipse([hx - 4 + fx, hy - 4 + fy, hx + 4 + fx, hy + 4 + fy], fill=SKIN)
+        d.ellipse([hx - 5, hy - 5, hx + 5, hy + 5], fill=g["hair"])
+        d.ellipse([hx - 4 + fx, hy - 4 + fy, hx + 4 + fx, hy + 4 + fy], fill=g["skin"])
         ex, ey = hx + 2 * fx + (1 if fx == 0 else 0), hy + 2 * fy - (1 if fy == 0 else 0)
         d.point((ex, ey), fill=OUT)  # oeil
     if "front" in parts:
         if "kneeF" in J:
             line(d, J["hip"], J["kneeF"], g["gi"], 5)
             line(d, J["kneeF"], J["footF"], g["gi"], 4)
-            d.ellipse([J["footF"][0] - 2, J["footF"][1] - 1, J["footF"][0] + 2, J["footF"][1] + 1], fill=SKIN)
+            d.ellipse([J["footF"][0] - 2, J["footF"][1] - 1, J["footF"][0] + 2, J["footF"][1] + 1], fill=g["skin"])
         if "elbowF" in J:
             line(d, J["neck"], J["elbowF"], g["gi"], 4)
             line(d, J["elbowF"], J["handF"], g["gi"], 3)
             h = J["handF"]
-            d.ellipse([h[0] - 2, h[1] - 2, h[0] + 2, h[1] + 2], fill=SKIN)
+            d.ellipse([h[0] - 2, h[1] - 2, h[0] + 2, h[1] + 2], fill=g["skin"])
 
 
 def outline(im):
@@ -202,7 +205,16 @@ G_BACK = (
          kneeB=(28, 31), footB=(36, 35), face=(1, 0)),
     ["A.back", "A.body", "B.back", "B.body", "B.front", "A.front"],
 )
-GROUND_POS = [G_GUARD, G_HALF, G_SIDE, G_MOUNT, G_BACK]
+G_KNEE = (
+    dict(lying(8, 33), elbowF=(19, 28), handF=(23, 23), elbowB=(16, 30), handB=(21, 26),
+         kneeF=(40, 28), footF=(48, 37), kneeB=(42, 31), footB=(53, 37)),
+    dict(head=(23, 7), neck=(26, 12), hip=(33, 24), elbowF=(20, 20), handF=(16, 29),
+         elbowB=(31, 16), handB=(36, 10), kneeF=(27, 30), footF=(42, 31),
+         kneeB=(42, 30), footB=(50, 37), face=(-1, 1)),
+    ["B.back", "B.body", "B.front", "A.back", "A.body", "A.front"],
+)
+# ordre = enum POS_* du jeu : garde, demi-garde, 100 kg, genou, montee, dos
+GROUND_POS = [G_GUARD, G_HALF, G_SIDE, G_KNEE, G_MOUNT, G_BACK]
 
 
 def render_pair(B, A, order, dx=0, dy=0):
