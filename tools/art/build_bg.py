@@ -409,11 +409,8 @@ def hud_band(cv):
     cv.dither(0, 0, W, 6, P3(K3))
     for x in range(0, W, 32):
         for k in range(4):
-            cv.px(x + 8 + k, 50 - k, P3(DBL3))
-    cv.rect(0, 52, W, 53, P3(K3))
-    cv.rect(0, 53, W, 54, P3(OR3))
-    cv.rect(0, 54, W, 55, P3(YE3))
-    cv.rect(0, 55, W, 56, P3(K3))
+            cv.px(x + 8 + k, 44 - k, P3(DBL3))
+    cv.rect(0, 55, W, 56, P3(OR3))
 
 
 def with_band(fn):

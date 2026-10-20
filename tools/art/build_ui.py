@@ -417,7 +417,7 @@ def build_shadow_pair():
 
 
 # ---------------------------------------------------------------- arbitre
-REF_MAP = {0: 0, 1: K, 2: SK, 3: SK, 4: SKS, 5: DG, 6: K, 7: DG, 8: K, 9: K, 10: K, 11: K, 12: SKS,
+REF_MAP = {0: 0, 1: K, 2: SK, 3: SK, 4: SKS, 5: K, 6: K, 7: DG, 8: K, 9: K, 10: K, 11: K, 12: SKS,
            13: RD, 14: WH, 15: WH, 17: LG, 18: LG, 19: DG, 20: DG, 21: DG}
 RW, RH, RX = 96, 112, 48
 

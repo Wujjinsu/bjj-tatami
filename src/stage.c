@@ -32,10 +32,13 @@ void stageLoad(u16 idx)
     for (y = 0; y < 224; y++)
     {
         u16 f;
-        if (y < 40) f = 115;
-        else if (y < 120) f = 150 + (y - 40) * 68 / 80;
-        else if (y < 144) f = 236;
-        else f = 240 + (y - 144) * 16 / 56;
+        /* parallaxe par bandes (un plan = un facteur, sinon les murs se deforment),
+           le tapis seul a un degrade ligne par ligne pour la perspective */
+        if (y < 56) f = 0;                                  /* bandeau du score */
+        else if (y >= 144) f = 240 + (y - 144) * 16 / 80;   /* tapis */
+        else if (idx == 1) f = 200;                         /* academie : mur plat */
+        else if (idx == 2) f = (y < 96) ? 60 : (y < 112 ? 110 : (y < 136 ? 180 : 230));
+        else f = (y < 120) ? 160 : 224;                     /* arene : public / panneaux */
         fac[y] = f;
         hsA[y] = 0;
     }
