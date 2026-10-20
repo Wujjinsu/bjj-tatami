@@ -124,8 +124,8 @@ void crowdReact(bool big)
 }
 
 /* ------------------------------------------------------------------ voix de l'arbitre (PCM4, canal 3) */
-static const u8* const voiceData[VO_COUNT] = { vo_oss, vo_combate, vo_finalizou, vo_tempo, vo_vitoria, vo_empate, vo_desclassificado, vo_perfeito, vo_campeao, vo_final, vo_pronto, vo_parou, vo_pontos2, vo_pontos3, vo_pontos4, vo_vantagem, vo_punicao, vo_lutem };
-static const u16 voiceSize[VO_COUNT] = { sizeof(vo_oss), sizeof(vo_combate), sizeof(vo_finalizou), sizeof(vo_tempo), sizeof(vo_vitoria), sizeof(vo_empate), sizeof(vo_desclassificado), sizeof(vo_perfeito), sizeof(vo_campeao), sizeof(vo_final), sizeof(vo_pronto), sizeof(vo_parou), sizeof(vo_pontos2), sizeof(vo_pontos3), sizeof(vo_pontos4), sizeof(vo_vantagem), sizeof(vo_punicao), sizeof(vo_lutem) };
+static const u8* const voiceData[VO_COUNT] = { vo_oss, vo_combate, vo_finalizou, vo_tempo, vo_vitoria, vo_empate, vo_desclassificado, vo_perfeito, vo_campeao, vo_final, vo_pronto, vo_parou, vo_contra, vo_especial, vo_pontos2, vo_pontos3, vo_pontos4, vo_vantagem, vo_punicao, vo_lutem };
+static const u16 voiceSize[VO_COUNT] = { sizeof(vo_oss), sizeof(vo_combate), sizeof(vo_finalizou), sizeof(vo_tempo), sizeof(vo_vitoria), sizeof(vo_empate), sizeof(vo_desclassificado), sizeof(vo_perfeito), sizeof(vo_campeao), sizeof(vo_final), sizeof(vo_pronto), sizeof(vo_parou), sizeof(vo_contra), sizeof(vo_especial), sizeof(vo_pontos2), sizeof(vo_pontos3), sizeof(vo_pontos4), sizeof(vo_vantagem), sizeof(vo_punicao), sizeof(vo_lutem) };
 static s16 voiceTimer;
 
 void voiceSay(u16 v)

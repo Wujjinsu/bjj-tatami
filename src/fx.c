@@ -15,6 +15,7 @@ static Pop pops[NPOPS];
 typedef struct { Sprite* s; s16 x, y, t, base; } Fx;
 static Fx fxs[NFX];
 
+static Sprite* prompt[2];
 static Sprite* ref;
 static s16 refX, refGoal, refSig, refAnim, refTick, refFrame, refDir = -1;
 static bool refVisible;
@@ -40,7 +41,23 @@ void fxInit(void)
         SPR_setDepth(fxs[i].s, SPR_MIN_DEPTH + 2);
         fxs[i].t = 0;
     }
+    for (i = 0; i < 2; i++)
+    {
+        prompt[i] = SPR_addSprite(&spr_prompt, 0, 0, TILE_ATTR(PAL3, TRUE, FALSE, FALSE));
+        SPR_setVisibility(prompt[i], HIDDEN);
+        SPR_setDepth(prompt[i], SPR_MIN_DEPTH + 3);
+    }
     ref = NULL;
+}
+
+/* invite de bouton au-dessus d'un combattant (rebondit pour attirer l'oeil) */
+void fxPrompt(u16 slot, s16 pr, s16 wx, s16 wy)
+{
+    if (!prompt[slot]) return;
+    if (pr < 0) { SPR_setVisibility(prompt[slot], HIDDEN); return; }
+    SPR_setFrame(prompt[slot], pr);
+    SPR_setVisibility(prompt[slot], ((frameCount >> 2) & 3) == 3 ? HIDDEN : VISIBLE);
+    SPR_setPosition(prompt[slot], wx - camX() - 16, wy - 18 - ((frameCount >> 2) & 1) * 2);
 }
 
 void fxRelease(void)
@@ -52,6 +69,7 @@ void fxRelease(void)
     for (i = 0; i < NFX; i++) { if (fxs[i].s) SPR_releaseSprite(fxs[i].s); fxs[i].s = NULL; }
     if (ref) SPR_releaseSprite(ref);
     ref = NULL;
+    for (i = 0; i < 2; i++) { if (prompt[i]) SPR_releaseSprite(prompt[i]); prompt[i] = NULL; }
 }
 
 /* ------------------------------------------------------------------ bannieres */

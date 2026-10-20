@@ -331,7 +331,7 @@ def scale_nn(a, s):
 
 BANNERS = [("OSS!", 30), ("COMBATE!", 30), ("FINALIZOU!", 28), ("TEMPO!", 30), ("VITORIA!", 30),
            ("EMPATE", 30), ("DESCLASSIFICADO", 17), ("PERFEITO!", 28), ("CAMPEAO!", 30), ("FINAL", 30),
-           ("PRONTO?", 30), ("PAROU!", 30)]
+           ("PRONTO?", 30), ("PAROU!", 30), ("CONTRA!", 30), ("ESPECIAL!", 28)]
 BW, BH = 248, 48
 
 
@@ -351,7 +351,7 @@ def build_banners():
     return a
 
 
-POPS = ["+2", "+3", "+4", "AV", "PEN", "-2", "OSS", "!"]
+POPS = ["+2", "+3", "+4", "AV", "PEN", "-2", "OSS", "!", "BLOC"]
 
 
 def build_pops():
@@ -361,11 +361,104 @@ def build_pops():
             img = text_img("!", 18, grad=(WH, YE, OR, RD), thick=1)
         elif p in ("PEN", "-2"):
             img = text_img(p, 12, grad=(WH, WH, LG), outline=RD, thick=1)
+        elif p == "BLOC":
+            img = text_img(p, 11, grad=(WH, LG, LG), outline=DBL, thick=1)
         elif p == "AV":
             img = text_img(p, 13, grad=(WH, YE, YE, OR), outline=K, thick=1)
         else:
             img = text_img(p, 14, grad=(WH, YE, YE, OR), outline=DGR, thick=1)
         cells.append(fit(img, 32, 24))
+    return np.concatenate(cells, axis=1)
+
+
+# ---------------------------------------------------------------- invites de bouton (au-dessus des tetes)
+PROMPTS = ["C_UP", "C_SIDE", "C_DOWN", "C", "A_MASH", "C_MASH", "UP", "DOWN", "LEFT", "RIGHT", "BC"]
+BTN_COL = {"A": RD, "B": YE, "C": BL}
+
+
+def big_button(letter):
+    """bouton rond 16x16 avec grosse lettre."""
+    a = np.zeros((16, 16), np.uint8)
+    yy, xx = np.mgrid[0:16, 0:16]
+    r = (yy - 7.5) ** 2 + (xx - 7.5) ** 2
+    col = BTN_COL[letter]
+    a[r <= 62] = K
+    a[r <= 48] = col
+    a[(r <= 48) & (yy >= 11)] = {RD: DR, YE: OR, BL: DBL}[col]
+    fnt = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+    tmp = Image.new("L", (16, 16), 0)
+    d = ImageDraw.Draw(tmp)
+    d.fontmode = "1"
+    bb = d.textbbox((0, 0), letter, font=fnt)
+    d.text(((16 - (bb[2] - bb[0])) // 2 - bb[0], (16 - (bb[3] - bb[1])) // 2 - bb[1]), letter, font=fnt, fill=255)
+    m = np.array(tmp) > 0
+    sh = np.zeros_like(m)
+    sh[1:, 1:] = m[:-1, :-1]
+    a[sh & (r <= 48)] = K
+    a[m] = K if letter == "B" else WH
+    return a
+
+
+def arrow(kind):
+    """fleche 16x16 blanche cernee de noir."""
+    m = np.zeros((16, 16), bool)
+    if kind in ("UP", "DOWN"):
+        for y in range(7):
+            m[1 + y, 7 - y:9 + y] = True
+        m[8:15, 5:11] = True
+        if kind == "DOWN":
+            m = m[::-1]
+    elif kind in ("LEFT", "RIGHT"):
+        for x in range(7):
+            m[7 - x:9 + x, 1 + x] = True
+        m[5:11, 8:15] = True
+        if kind == "RIGHT":
+            m = m[:, ::-1]
+    else:  # SIDE : double fleche
+        for x in range(5):
+            m[7 - x:9 + x, 1 + x] = True
+            m[7 - x:9 + x, 14 - x] = True
+        m[6:10, 5:11] = True
+    a = np.zeros((16, 16), np.uint8)
+    d = m.copy()
+    d[1:, :] |= m[:-1, :]
+    d[:-1, :] |= m[1:, :]
+    d[:, 1:] |= m[:, :-1]
+    d[:, :-1] |= m[:, 1:]
+    a[d] = K
+    a[m] = WH
+    a[m & (np.arange(16)[:, None] < 6)] = YE
+    return a
+
+
+def mash(letter):
+    a = np.zeros((16, 16), np.uint8)
+    b = big_button(letter)
+    a[:, :] = b
+    return a
+
+
+def build_prompts():
+    cells = []
+    for p in PROMPTS:
+        c = np.zeros((16, 32), np.uint8)
+        if p.startswith("C_") and p != "C_MASH":
+            c[:, 0:16] = big_button("C")
+            c[:, 16:32] = arrow(p[2:])
+        elif p == "C":
+            c[:, 8:24] = big_button("C")
+        elif p.endswith("_MASH"):
+            c[:, 0:16] = big_button(p[0])
+            # traits de vitesse : "appuie vite"
+            for k in range(3):
+                c[3 + k * 4:5 + k * 4, 18:30 - k * 3] = YE
+                c[5 + k * 4, 18:30 - k * 3] = K
+        elif p == "BC":
+            c[:, 0:16] = big_button("B")
+            c[:, 16:32] = big_button("C")
+        else:
+            c[:, 8:24] = arrow(p)
+        cells.append(c)
     return np.concatenate(cells, axis=1)
 
 
@@ -493,6 +586,7 @@ def main():
     save_idx(T.sheet(), os.path.join(ROOT, "res", "ui", "hud.png"))
     save_idx(build_banners(), os.path.join(ROOT, "res", "sprites", "banner.png"))
     save_idx(build_pops(), os.path.join(ROOT, "res", "sprites", "pops.png"))
+    save_idx(build_prompts(), os.path.join(ROOT, "res", "sprites", "prompt.png"))
     save_idx(build_fx(), os.path.join(ROOT, "res", "sprites", "fx.png"))
     save_idx(build_shadow_pair(), os.path.join(ROOT, "res", "sprites", "shadow_pair.png"))
     save_idx(build_referee(), os.path.join(ROOT, "res", "sprites", "referee.png"))
@@ -505,7 +599,8 @@ def main():
     h.append("enum { %s, FLAG_COUNT };" % ", ".join("FLAG_" + f for f in FLAGS))
     h.append("enum { %s, BANNER_COUNT };" % ", ".join(
         "BAN_" + w.strip("!?").replace(" ", "_") for w, _ in BANNERS))
-    h.append("enum { POP_P2, POP_P3, POP_P4, POP_AV, POP_PEN, POP_M2, POP_OSS, POP_DANGER, POP_COUNT };")
+    h.append("enum { POP_P2, POP_P3, POP_P4, POP_AV, POP_PEN, POP_M2, POP_OSS, POP_DANGER, POP_BLOC, POP_COUNT };")
+    h.append("enum { %s, PR_COUNT };" % ", ".join("PR_" + p for p in PROMPTS))
     h.append("enum { %s, REF_COUNT };" % ", ".join("REF_" + n for n, _, _ in REF_ANIMS))
     h.append("static const u8 refFrames[REF_COUNT] = { %s };" % ", ".join(str(n) for _, _, n in REF_ANIMS))
     h.append("#define FX_IMPACT 0")

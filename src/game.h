@@ -92,6 +92,15 @@ typedef struct
     s16 animFrame, animTick;
     bool animRev;
     s16 sweat;
+    bool animHold;              /* animation figee (temps de preparation d'une attaque) */
+
+    /* arcade : telegraphie, contres, super */
+    s16 superG;                 /* jauge de super technique (0..100) */
+    s16 wind, windMax;          /* preparation d'une attaque debout (visible par l'adversaire) */
+    bool sure;                  /* attaque imparable (ouverture / super) */
+    s16 opening;                /* ouverture : la prochaine technique part instantanement */
+    s16 stun;                   /* sonne apres un contre */
+    s16 stunNext;               /* sonne a appliquer au retour debout */
 
     /* IA */
     u16 aiWant;
@@ -148,6 +157,11 @@ void buildFighterPalette(u16* pal, const FighterDef* f, u8 gi);
 void applyFighterPalettes(void);
 void drawPortrait(u16 who, u16 gid, u16 x, u16 y, u16 tileBase);
 void fadeOut(u16 frames);
+void fighterTint(u16 who, u16 mode);     /* 0 normal, 1 eclairci (attaque qui arrive), 2 blanc (choc), 3 dore (super) */
+void stageDim(bool on);
+void gfxFlash(u16 frames);
+void gfxUpdate(void);
+#define PORTRAIT_TILE   488
 void fadeInScreen(u16 frames);
 
 /* scene de combat (stage.c) */
@@ -167,7 +181,7 @@ void hudMessageWho(u16 who, const char* s, u16 pts);
 void hudUpdate(void);
 void hudHints(const char* const* lines, u16 n);
 void hudClearHints(void);
-void hudSubGauge(const char* name, u16 gate, s16 a0, s16 alen, s16 d0, s16 dlen, s16 tug, u16 cells);
+void hudSubGauge(const char* name, s16 tug);
 void hudSubClear(void);
 
 /* effets, arbitre, bannieres (fx.c) */
@@ -179,6 +193,7 @@ bool fxBannerActive(void);
 void fxPop(u16 kind, s16 wx, s16 wy);
 void fxImpact(s16 wx, s16 wy, bool big);
 void fxDust(s16 wx, s16 wy);
+void fxPrompt(u16 slot, s16 pr, s16 wx, s16 wy);    /* pr < 0 : cache l'invite */
 void refInit(s16 wx);
 void refSignal(u16 anim, s16 faceToX, u16 frames);
 void refFollow(s16 cx);
@@ -201,6 +216,7 @@ void actorsPairWorldPos(u16 role, s16* wx, s16* wy);
 s16  actorsPairAnchor(void);
 bool actorsPairFlip(void);
 void actorsShake(s16 frames);
+bool actorsImpact(void);             /* TRUE une fois apres une image de chute (pour l'arret sur image) */
 void actorsShow(bool show);
 void actorsShadows(bool show);
 void actorsDraw(void);
@@ -228,7 +244,7 @@ void crowdStop(void);
 void crowdReact(bool big);
 void crowdUpdate(bool tense);
 /* voix de l'arbitre (meme ordre que les bannieres BAN_*, puis les annonces de points) */
-enum { VO_OSS, VO_COMBATE, VO_FINALIZOU, VO_TEMPO, VO_VITORIA, VO_EMPATE, VO_DESCLASSIFICADO, VO_PERFEITO, VO_CAMPEAO, VO_FINAL, VO_PRONTO, VO_PAROU, VO_P2, VO_P3, VO_P4, VO_VANTAGEM, VO_PUNICAO, VO_LUTEM, VO_COUNT };
+enum { VO_OSS, VO_COMBATE, VO_FINALIZOU, VO_TEMPO, VO_VITORIA, VO_EMPATE, VO_DESCLASSIFICADO, VO_PERFEITO, VO_CAMPEAO, VO_FINAL, VO_PRONTO, VO_PAROU, VO_CONTRA, VO_ESPECIAL, VO_P2, VO_P3, VO_P4, VO_VANTAGEM, VO_PUNICAO, VO_LUTEM, VO_COUNT };
 void voiceSay(u16 v);
 extern const u16 tuneWin[6];
 extern const u16 tuneLose[4];

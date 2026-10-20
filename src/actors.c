@@ -20,6 +20,9 @@ static bool pRev, pFlip, pDone;
 static s16 pAnchor;
 static u16 pRoleA;
 static s16 pShake;
+static bool impactFlag;
+
+bool actorsImpact(void) { bool r = impactFlag; impactFlag = FALSE; return r; }
 
 void actorsInit(void)
 {
@@ -97,6 +100,7 @@ void actorsSoloUpdate(void)
     {
         Player* p = &P[i];
         const SoloAnim* a = &soloAnims[p->anim];
+        if (p->animHold) continue;
         if (++p->animTick >= a->f[p->animFrame].ticks)
         {
             if (p->animRev)
@@ -172,6 +176,7 @@ bool actorsPairUpdate(void)
             actorsPairWorldPos(1, &x, &y);
             fxImpact(x, y + 6, TRUE);
             sfxSlam();
+            impactFlag = TRUE;
             stageCheer(90);
         }
         else if (!pDone && ((s->f[pFrame].owners >> 3) & 3) == 2)

@@ -17,6 +17,7 @@ SPRITE  spr_pops        "sprites/pops.png"          4 3 NONE 0
 SPRITE  spr_fx          "sprites/fx.png"            4 4 NONE 0
 SPRITE  spr_shadow_pair "sprites/shadow_pair.png"   16 2 NONE 0
 SPRITE  spr_referee     "sprites/referee.png"       12 14 NONE 0
+SPRITE  spr_prompt      "sprites/prompt.png"        4 2 NONE 0
 WAV     title_intro     "music/title_intro.wav"     PCM 13400
 WAV     title_loop      "music/title_loop.wav"      PCM 13400
 WAV     crowd_loop      "sfx/crowd_loop.wav"        PCM4
@@ -69,3 +70,5 @@ WAV     vo_pontos4          "voice/pontos4.wav"          PCM4
 WAV     vo_vantagem         "voice/vantagem.wav"         PCM4
 WAV     vo_punicao          "voice/punicao.wav"          PCM4
 WAV     vo_lutem            "voice/lutem.wav"            PCM4
+WAV     vo_contra           "voice/contra.wav"         PCM4
+WAV     vo_especial         "voice/especial.wav"       PCM4

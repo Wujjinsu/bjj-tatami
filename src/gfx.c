@@ -8,6 +8,7 @@
 
 static u16 curPal[64];
 static bool palHold;
+static u16 tintNow[2];
 static u16 screenEnd = BG_BASE;
 
 static void palApply(u16 index, u16 count)
@@ -119,6 +120,7 @@ void applyFighterPalettes(void)
     buildFighterPalette(P[1].pal, P[1].def, P[1].gi);
     memcpy(curPal + 16, P[0].pal, 32);
     memcpy(curPal + 32, P[1].pal, 32);
+    tintNow[0] = tintNow[1] = 0;
     palApply(16, 32);
 }
 
@@ -127,4 +129,58 @@ void drawPortrait(u16 who, u16 gid, u16 x, u16 y, u16 tileBase)
 {
     VDP_drawImageEx(BG_A, portraits[gid], TILE_ATTR_FULL(who ? PAL2 : PAL1, TRUE, FALSE, FALSE, tileBase),
                     x, y, FALSE, DMA);
+}
+
+/* ------------------------------------------------------------------ teintes de combat */
+static u16 tintBuf[16];
+static s16 flashT;
+
+static u16 tintColor(u16 c, u16 mode)
+{
+    u16 r = (c >> 1) & 7, g = (c >> 5) & 7, b = (c >> 9) & 7;
+    switch (mode)
+    {
+        case 1: r = r + 3 > 7 ? 7 : r + 3; g = g + 3 > 7 ? 7 : g + 3; b = b + 2 > 7 ? 7 : b + 2; break;
+        case 2: r = g = b = 7; break;
+        case 3: r = r + 4 > 7 ? 7 : r + 4; g = g + 3 > 7 ? 7 : g + 3; b = b >> 1; break;
+        case 4: r >>= 1; g >>= 1; b >>= 1; break;
+        default: break;
+    }
+    return (b << 9) | (g << 5) | (r << 1);
+}
+
+/* teinte d'un combattant (palette PAL1 / PAL2) ; 0 = palette normale */
+void fighterTint(u16 who, u16 mode)
+{
+    u16 i, base = 16 + who * 16;
+    if (palHold || tintNow[who] == mode) return;
+    tintNow[who] = mode;
+    tintBuf[0] = 0;
+    for (i = 1; i < 16; i++) tintBuf[i] = mode ? tintColor(curPal[base + i], mode) : curPal[base + i];
+    if (mode == 2) tintBuf[1] = curPal[base + 1];      /* garde le contour */
+    PAL_setColors(base, tintBuf, 16, DMA_QUEUE);
+}
+
+/* decor assombri pendant une super technique */
+void stageDim(bool on)
+{
+    u16 i;
+    if (palHold) return;
+    for (i = 0; i < 16; i++) tintBuf[i] = on ? tintColor(curPal[i], 4) : curPal[i];
+    PAL_setColors(0, tintBuf, 16, DMA_QUEUE);
+}
+
+/* eclair blanc sur le decor (quelques images) */
+void gfxFlash(u16 frames)
+{
+    u16 i;
+    if (palHold) return;
+    for (i = 0; i < 16; i++) tintBuf[i] = tintColor(curPal[i], 1);
+    PAL_setColors(0, tintBuf, 16, DMA_QUEUE);
+    flashT = frames;
+}
+
+void gfxUpdate(void)
+{
+    if (flashT > 0 && --flashT == 0 && !palHold) PAL_setColors(0, curPal, 16, DMA_QUEUE);
 }

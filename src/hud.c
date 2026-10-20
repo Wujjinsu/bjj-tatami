@@ -14,6 +14,7 @@ static u32 barData[2][BAR_TILES][8];
 static s16 lastS[2] = { -1, -1 }, lastC[2] = { -1, -1 }, lastBlink = -1;
 static s16 lastPts[2] = { -1, -1 }, lastAdv[2] = { -1, -1 }, lastPen[2] = { -1, -1 }, lastGrip[2] = { -1, -1 };
 static s16 lastSecs = -1;
+static s16 lastSup[2] = { -1, -1 };
 static s16 msgTimer;
 
 enum { K = 1, WH = 2, LG = 3, DG = 4, RD = 5, DR = 6, GR = 7, DGR = 8, YE = 9, OR = 10, BL = 11, DBL = 12, NV = 15 };
@@ -97,7 +98,7 @@ void hudInit(void)
         for (t = 0; t < BAR_TILES; t++)
             VDP_setTileMapXY(BG_A, TILE_ATTR_FULL(PAL3, TRUE, FALSE, FALSE, BAR_BASE + p * BAR_TILES + t),
                              (p == 0 ? 1 : 23) + t, 2);
-        lastS[p] = lastC[p] = lastPts[p] = lastAdv[p] = lastPen[p] = lastGrip[p] = -1;
+        lastS[p] = lastC[p] = lastPts[p] = lastAdv[p] = lastPen[p] = lastGrip[p] = lastSup[p] = -1;
     }
     /* cadre du chrono */
     putTile(17, 0, HT_BOX_TIME_TOP);
@@ -147,10 +148,38 @@ void hudDraw(s32 framesLeft, bool full)
             for (k = 0; k < 5; k++)
             {
                 u16 x = (p == 0) ? 7 + k : 32 - k;
-                if (P[p].grip > 0) putTile(x, 4, k < n ? HT_SUB_ATT : HT_SUB_EMPTY);
-                else VDP_setTileMapXY(BG_A, 0, x, 4);
+                if (P[p].grip > 0) putTile(x, 3, k < n ? HT_SUB_ATT : HT_SUB_EMPTY);
+                else VDP_setTileMapXY(BG_A, 0, x, 3);
             }
             lastGrip[p] = n;
+        }
+        {
+            /* jauge de super technique : 8 cases, clignote quand elle est pleine (B+C) */
+            u16 n = P[p].superG * 8 / 100;
+            bool fullG = P[p].superG >= 100;
+            s16 key = n * 4 + (fullG ? 1 + ((frameCount >> 3) & 1) : 0);
+            if (full || key != lastSup[p])
+            {
+                u16 k;
+                for (k = 0; k < 8; k++)
+                {
+                    u16 x = (p == 0) ? 7 + k : 32 - k;
+                    u16 t = (k < n) ? HT_SUB_DEF : HT_SUB_EMPTY;
+                    if (fullG) t = ((frameCount >> 3) & 1) ? HT_SUB_BOTH : HT_SUB_ATT;
+                    putTile(x, 4, t);
+                }
+                if (fullG)
+                {
+                    putTile(p == 0 ? 15 : 23, 4, HT_BTN_B);
+                    putTile(p == 0 ? 16 : 24, 4, HT_BTN_C);
+                }
+                else
+                {
+                    VDP_setTileMapXY(BG_A, 0, p == 0 ? 15 : 23, 4);
+                    VDP_setTileMapXY(BG_A, 0, p == 0 ? 16 : 24, 4);
+                }
+                lastSup[p] = key;
+            }
         }
     }
     lastBlink = (frameCount >> 3) & 1;
@@ -250,35 +279,28 @@ static void buildTug(s16 tug)
 }
 
 /* ------------------------------------------------------------------ mini-jeu de soumission */
-void hudSubGauge(const char* name, u16 gate, s16 a0, s16 alen, s16 d0, s16 dlen, s16 tug, u16 cells)
-{
-    static u16 row[40];
-    u16 k;
-    s16 idx;
-    char b[41];
+static const char* lastName;
+static void hudSubReset(void) { lastName = NULL; }
 
-    b[0] = 0;
-    scat(b, name, 40);
-    gtxtC(b, 8);
-    for (k = 0; k < 3; k++) putTile(17 + k * 2, 9, k < gate ? HT_GATE_ON : HT_GATE_OFF);
-    for (k = 0; k < cells; k++)
+void hudSubGauge(const char* name, s16 tug)
+{
+    static u16 row[TUG_TILES];
+    u16 k;
+    if (name != lastName)
     {
-        bool ina = (s16)k >= a0 && (s16)k < a0 + alen;
-        bool ind = (s16)k >= d0 && (s16)k < d0 + dlen;
-        u16 t = ina ? (ind ? HT_SUB_BOTH : HT_SUB_ATT) : (ind ? HT_SUB_DEF : HT_SUB_EMPTY);
-        row[k] = TILE_ATTR_FULL(PAL3, TRUE, FALSE, FALSE, HUD_BASE + t);
+        gtxtC(name, 8);
+        wtxt("ECHAPPE", 2, 10);
+        wtxt("TAPE", 31, 10);
+        lastName = name;
     }
-    VDP_setTileMapDataRow(BG_A, row, 10, (40 - cells) / 2, cells, CPU);
-    /* jauge de la porte : ECHAPPE [=====|=====] TAPE, tuiles dessinees a la volee */
     buildTug(tug);
     for (k = 0; k < TUG_TILES; k++)
         row[k] = TILE_ATTR_FULL(PAL3, TRUE, FALSE, FALSE, TUG_BASE + k);
-    VDP_setTileMapDataRow(BG_A, row, 11, 10, TUG_TILES, CPU);
-    wtxt("ECHAPPE", 2, 11);
-    wtxt("TAPE", 31, 11);
+    VDP_setTileMapDataRow(BG_A, row, 10, 10, TUG_TILES, CPU);
 }
 
 void hudSubClear(void)
 {
     clearRows(8, 11);
+    hudSubReset();
 }
