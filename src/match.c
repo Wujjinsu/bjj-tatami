@@ -209,42 +209,51 @@ static void bar10(s16 souffle, s16 cardio, char* out)
     out[12] = 0;
 }
 
+static void put(char* line, u16 x, const char* s)
+{
+    while (*s && x < 40) line[x++] = *s++;
+}
+
+/* le HUD est reecrit en entier (sans effacer avant) : pas de clignotement */
 static void drawHud(void)
 {
-    char b[16];
+    char line[41], b[16];
     s32 secs = (matchFrames + 59) / 60;
-    u16 n;
+    u16 k;
 
-    clearRow(ROW_HUD1);
-    txt(P[0].label, 1, ROW_HUD1, TXT_DARK);
+    for (k = 0; k < 40; k++) line[k] = ' ';
+    line[40] = 0;
+    put(line, 1, P[0].label);
+    put(line, 12, "A"); numStr(P[0].adv, 1, b); put(line, 13, b);
+    put(line, 15, "P"); numStr(P[0].pen, 1, b); put(line, 16, b);
+    numStr((s16)(secs / 60), 1, b); put(line, 18, b);
+    put(line, 19, ":");
+    numStr((s16)(secs % 60), 2, b); put(line, 20, b);
+    put(line, 23, "P"); numStr(P[1].pen, 1, b); put(line, 24, b);
+    put(line, 26, "A"); numStr(P[1].adv, 1, b); put(line, 27, b);
+    put(line, 39 - slen(P[1].label), P[1].label);
+    txt(line, 0, ROW_HUD1, TXT_DARK);
     drawNum(P[0].points, 2, 9, ROW_HUD1, TXT_RED);
-    txt("A", 12, ROW_HUD1, TXT_DARK); drawNum(P[0].adv, 1, 13, ROW_HUD1, TXT_DARK);
-    txt("P", 15, ROW_HUD1, TXT_DARK); drawNum(P[0].pen, 1, 16, ROW_HUD1, TXT_DARK);
-
-    drawNum((s16)(secs / 60), 1, 18, ROW_HUD1, TXT_DARK);
-    txt(":", 19, ROW_HUD1, TXT_DARK);
-    drawNum((s16)(secs % 60), 2, 20, ROW_HUD1, TXT_DARK);
-
-    txt("P", 23, ROW_HUD1, TXT_DARK); drawNum(P[1].pen, 1, 24, ROW_HUD1, TXT_DARK);
-    txt("A", 26, ROW_HUD1, TXT_DARK); drawNum(P[1].adv, 1, 27, ROW_HUD1, TXT_DARK);
     drawNum(P[1].points, 2, 29, ROW_HUD1, TXT_RED);
-    n = slen(P[1].label);
-    txt(P[1].label, 39 - n, ROW_HUD1, TXT_DARK);
 
-    bar10(P[0].souffle, P[0].cardio, b); txt(b, 1, ROW_HUD2, TXT_DARK);
-    bar10(P[1].souffle, P[1].cardio, b); txt(b, 27, ROW_HUD2, TXT_DARK);
+    for (k = 0; k < 40; k++) line[k] = ' ';
+    bar10(P[0].souffle, P[0].cardio, b); put(line, 1, b);
+    bar10(P[1].souffle, P[1].cardio, b); put(line, 27, b);
+    txt(line, 0, ROW_HUD2, TXT_DARK);
 
-    clearRow(ROW_HUD3);
+    /* jauges de prises (debout) : "PR #####" a gauche et a droite, hors de la banniere */
+    for (k = 0; k < 40; k++) line[k] = ' ';
+    txt(line, 0, ROW_HUD3, TXT_DARK);
     if (phase == PH_STAND)
     {
-        u16 i, k;
+        u16 i;
         for (i = 0; i < 2; i++)
         {
             if (P[i].grip < 10) continue;
-            b[0] = 'P'; b[1] = 'R'; b[2] = 'I'; b[3] = 'S'; b[4] = 'E'; b[5] = ' ';
-            for (k = 0; k < 5; k++) b[6 + k] = (P[i].grip >= (k + 1) * 20 - 10) ? '#' : '-';
-            b[11] = 0;
-            txt(b, (i == 0) ? 1 : 28, ROW_HUD3, (P[i].grip >= 50) ? TXT_RED : TXT_DARK);
+            b[0] = 'P'; b[1] = 'R'; b[2] = ' ';
+            for (k = 0; k < 5; k++) b[3 + k] = (P[i].grip >= (k + 1) * 20 - 10) ? '#' : '-';
+            b[8] = 0;
+            txt(b, (i == 0) ? 1 : 31, ROW_HUD3, (P[i].grip >= 50) ? TXT_RED : TXT_DARK);
         }
     }
     hudDirty = FALSE;
@@ -917,15 +926,30 @@ static void drawSub(void)
     b[n++] = '1' + gate; b[n++] = '/'; b[n++] = '3'; b[n] = 0;
     txtCenter(b, ROW_INFO, TXT_DARK);
 
-    /* barre : '=' attaquant (rouge), '#' defenseur (vert), 'X' quand ils se couvrent */
-    txt("[", 5, ROW_GAUGE, TXT_DARK);
-    txt("]", 6 + BAR_CELLS, ROW_GAUGE, TXT_DARK);
-    for (k = 0; k < BAR_CELLS; k++)
+    /* barre : '=' attaquant (rouge), '#' defenseur (vert), 'X' quand ils se couvrent.
+       4 ecritures maximum : fond, defenseur (2 morceaux autour de l'attaquant), attaquant */
     {
-        bool ina = (s16)k >= a0 && (s16)k < a0 + lenA;
-        bool ind = (s16)k >= d0 && (s16)k < d0 + lenD;
-        char c[2] = { ina ? (ind ? 'X' : '=') : (ind ? '#' : '-'), 0 };
-        txt(c, 6 + k, ROW_GAUGE, ina ? TXT_RED : (ind ? TXT_GREEN : TXT_DARK));
+        char base[BAR_CELLS + 3], seg[BAR_CELLS + 1];
+        s16 a1 = a0 + lenA, d1 = d0 + lenD, x;
+        for (k = 0; k < BAR_CELLS; k++) base[1 + k] = '-';
+        base[0] = '['; base[BAR_CELLS + 1] = ']'; base[BAR_CELLS + 2] = 0;
+        txt(base, 5, ROW_GAUGE, TXT_DARK);
+
+        /* defenseur, a gauche de l'attaquant */
+        n = 0;
+        for (x = d0; x < d1 && x < a0; x++) seg[n++] = '#';
+        seg[n] = 0;
+        if (n) txt(seg, 6 + d0, ROW_GAUGE, TXT_GREEN);
+        /* defenseur, a droite de l'attaquant */
+        n = 0;
+        for (x = (d0 > a1 ? d0 : a1); x < d1; x++) seg[n++] = '#';
+        seg[n] = 0;
+        if (n) txt(seg, 6 + (d0 > a1 ? d0 : a1), ROW_GAUGE, TXT_GREEN);
+        /* attaquant, 'X' sur le defenseur */
+        n = 0;
+        for (x = a0; x < a1; x++) seg[n++] = (x >= d0 && x < d1) ? 'X' : '=';
+        seg[n] = 0;
+        txt(seg, 6 + a0, ROW_GAUGE, TXT_RED);
     }
 
     /* jauge de la porte */

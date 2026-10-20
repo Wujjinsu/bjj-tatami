@@ -64,7 +64,7 @@ def main():
     d = ImageDraw.Draw(im)
     d.fontmode = "1"                                  # pas d'anticrenelage : vrais pixels
 
-    cx, cy = 160, 104
+    cx, cy = 160, 100
     # rayons autour du badge
     for k in range(20):
         a0 = 2 * math.pi * k / 20
@@ -76,12 +76,12 @@ def main():
     # badge : anneau noir, filet jaune, disque vert, losange jaune, cercle bleu
     def disk(r, c):
         d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-    disk(72, 2)
-    disk(62, 4)
-    disk(60, 5)
-    d.polygon([(cx - 54, cy), (cx, cy - 36), (cx + 54, cy), (cx, cy + 36)], fill=4)
-    disk(24, 7)
-    d.arc([cx - 24, cy - 24, cx + 24, cy + 24], 200, 340, fill=15, width=3)   # bandeau du drapeau
+    disk(68, 2)
+    disk(58, 4)
+    disk(56, 5)
+    d.polygon([(cx - 50, cy), (cx, cy - 34), (cx + 50, cy), (cx, cy + 34)], fill=4)
+    disk(22, 7)
+    d.arc([cx - 22, cy - 22, cx + 22, cy + 22], 200, 340, fill=15, width=3)   # bandeau du drapeau
 
     # deux combattants (garde fermee) en pixel art x2
     B, A, order = gen_art.G_GUARD
@@ -97,7 +97,7 @@ def main():
                 ip[ox + x, oy + y] = GROUND_MAP.get(v, 2)
 
     # etoiles du badge (gauche / droite de l'anneau)
-    for sx in (cx - 67, cx + 67):
+    for sx in (cx - 63, cx + 63):
         d.polygon([(sx, cy - 5), (sx + 2, cy - 1), (sx + 6, cy - 1), (sx + 3, cy + 2),
                    (sx + 4, cy + 6), (sx, cy + 3), (sx - 4, cy + 6), (sx - 3, cy + 2),
                    (sx - 6, cy - 1), (sx - 2, cy - 1)], fill=4)
@@ -105,11 +105,11 @@ def main():
     # titre
     text_outlined(d, (160, 3), "BJJ TATAMI", 34, 4, outline=2, shadow=8)
     # sous-titre sous le badge
-    text_outlined(d, (160, 177), "JIU-JITSU BRESILIEN", 13, 15, outline=1)
+    text_outlined(d, (160, 171), "JIU-JITSU BRESILIEN", 13, 15, outline=1)
 
     # bande du bas pour le menu (texte ecrit par le jeu avec la police SGDK)
-    d.rectangle([0, 192, W - 1, H - 1], fill=0)
-    d.rectangle([0, 192, W - 1, 193], fill=4)
+    d.rectangle([0, 186, W - 1, H - 1], fill=0)
+    d.rectangle([0, 186, W - 1, 187], fill=4)
 
     out = os.path.join(ROOT, "res", "bg", "title.png")
     im.save(out)

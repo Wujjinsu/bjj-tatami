@@ -1,4 +1,4 @@
-BJJ TATAMI - prototype de jeu de jiu-jitsu bresilien pour Mega Drive (SGDK 2.11)
+BJJ TATAMI - jeu de jiu-jitsu bresilien pour Mega Drive (SGDK 2.11)
 ==============================================================================
 
 COMPILER (Windows)
@@ -17,30 +17,45 @@ JOUER
   RetroArch (coeur Genesis Plus GX ou PicoDrive) ou BlastEm.
   Manette 3 boutons suffit.
 
-COMMANDES
-  Ecran titre : GAUCHE / DROITE = niveau, START = combat
-  Debout      : GAUCHE / DROITE = se deplacer
-                A = projection (double leg) - il faut etre pres
-                B = tirer la garde
-                C = sprawl (contre une projection, au bon moment)
-  Au sol      : A = progresser (dessus) / balayer, s'echapper (dessous)
-                B = soumission (quand elle est disponible)
-  Lutte       : marteler A, B ou C pour pousser la jauge vers TOI.
+MENU (ecran titre)
+  START : menu. HAUT/BAS : choisir, GAUCHE/DROITE : changer, A : valider.
+  1 JOUEUR / 2 JOUEURS (manette 2) / NOM DU JOUEUR 1 (sauvegarde) / NIVEAU / DUREE.
+  Sans toucher a rien pendant 15 s : combat de demonstration.
+
+SELECTION
+  GAUCHE/DROITE : categorie de poids IBJJF (Galo -> Pesadissimo)
+  HAUT/BAS : combattant (3 par categorie, chacun ses stats et sa specialite)
+  Stats : GAR garde, PAS passage, LUT lutte, SOU soumission, CAR cardio.
+
+DEBOUT
+  GAUCHE/DROITE : se deplacer       B tenu (pres de lui) : prendre les prises
+  A : double-leg   HAUT+A : projection judo (il faut des prises)   BAS+A : single-leg
+  BAS+B : tirer la garde (il faut des prises)
+  C : sprawl (contre double et single)   HAUT+C : bloquer la hanche (contre le judo)
+
+AU SOL (facon UFC)
+  Les actions possibles s'affichent en haut : ^ = HAUT (ou rien), > = COTE, v = BAS.
+  A + direction : transition (passer, monter, balayer, sortir, se relever...)
+  B + direction : soumission
+  Quand l'adversaire lance "ATTAQUE !", tu ne sais pas laquelle : C + LA MEME
+  direction la bloque. Bien lire son adversaire, c'est tout le jeu.
+
+SOUMISSION : 3 PORTES
+  Chacun deplace son curseur avec la croix.
+  Attaquant (=) : couvrir le curseur adverse pour remplir la porte.
+  Defenseur (#) : lui echapper. 3 portes gagnees = il tape. Une porte perdue = il s'echappe.
+  Rater une soumission coute du souffle et 2 secondes sans pouvoir agir.
+
+SOUFFLE ET CARDIO (barres sous les noms)
+  # = souffle, - = cardio. Chaque effort coute du souffle ; il ne remonte jamais
+  au-dessus du cardio, qui baisse pendant le combat (moins vite si gros cardio).
+  Essouffle : projections plus faibles, curseur plus lent.
 
 REGLES
-  Match de 2 minutes. Points IBJJF : projection 2, balayage 2,
-  passage de garde 3, montee 4, prise de dos 4.
-  Avantage : garde ouverte, ou action presque reussie.
-  Soumission reussie = victoire immediate.
-  Le SOUFFLE (barre sous le score) baisse a chaque effort et donne de la
-  force aux appuis : un combattant epuise pousse moins fort. Dessous, en
-  controle lateral, montee ou dos, on recupere moins vite.
-
-POSITIONS ET ACTIONS
-  Dessus : garde fermee -> demi-garde -> controle lateral -> montee -> dos
-  Dessous : balayage depuis la garde, reprise de garde, sortie, upa, retournement
-  Soumissions : cle de cheville (dans la garde, dessus), triangle (garde, dessous),
-                kimura (controle lateral), cle de bras (montee), etranglement (dos)
+  Points IBJJF : projection 2, balayage 2, genou au ventre 2, passage 3, montee 4, dos 4.
+  Avantages : garde ouverte, soumission presque reussie.
+  Penalite toutes les 30 s sans rien tenter (2e = avantage adverse, 3e = 2 points).
+  Fin du temps : points, puis avantages, puis penalites, puis decision des arbitres.
 
 MUSIQUE DE L'ECRAN TITRE
   Extraite de "Jiu-Jitsu Evolucao" : l'intro (0 a 11,3 s) jouee une fois, puis
@@ -65,17 +80,23 @@ PUBLIC (pendant le match)
   Meme remarque que pour la musique : usage perso uniquement.
 
 FICHIERS
-  src/main.c            tout le code du jeu
+  src/main.c            boucle principale
+  src/match.c           le combat (debout, sol, soumissions, IA)
+  src/screens.c         titre, nom, selection, versus, resultat
+  src/roster.c          les 27 combattants (noms et stats modifiables)
+  src/ui.c              textes, palettes, manettes, sons, sauvegarde
   res/resources.res     liste des images pour rescomp
   res/bg, res/sprites   images (PNG 16 couleurs)
   res/music             musique de l'ecran titre (WAV 13,4 kHz)
   res/sfx               bruits du public (WAV 16 kHz)
-  tools/gen_art.py      regenere les images (python3 + Pillow)
+  tools/gen_art.py      regenere les sprites et le dojo (python3 + Pillow)
+  tools/gen_title.py    regenere l'ecran titre
   tools/convert_music.py convertit un morceau en musique d'ecran titre
 
-REGLAGES FACILES (src/main.c)
-  MATCH_SECONDS  duree du match
-  cpuPressRate   vitesse de martelage du CPU par niveau (sur 256 par image)
-  cpuSprawlPct   probabilite que le CPU contre une projection
-  GAUGE_MAX      longueur de la jauge de lutte
-  movePower()    difficulte de chaque soumission / sortie selon la position
+REGLAGES FACILES (src/match.c)
+  topMoves / botMoves  transitions au sol : nom, position d'arrivee, points, difficulte
+  topSubs / botSubs    soumissions par position
+  cpuDeny / cpuRead    a quel point le CPU bloque et lit tes attaques (par niveau)
+  cpuReact / cpuEscape vitesse du CPU dans le mini-jeu de soumission
+  STALL_FRAMES         delai avant penalite de passivite
+  Les combattants se modifient dans src/roster.c.
