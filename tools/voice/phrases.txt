@@ -1,0 +1,17 @@
+combate|Combate!
+parou|Parou!
+oss|Ôss!
+pontos2|Dois pontos!
+pontos3|Três pontos!
+pontos4|Quatro pontos!
+vantagem|Vantagem!
+punicao|Punição!
+finalizou|Finalizou!
+desclassificado|Desclassificado!
+tempo|Tempo!
+empate|Empate!
+vitoria|Vitória!
+campeao|Campeão!
+final|Grande final!
+pronto|Pronto?
+lutem|Lutem!

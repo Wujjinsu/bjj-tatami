@@ -1,0 +1,27 @@
+name: Voix de l'arbitre
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  voices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer les synthetiseurs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng
+          pip install piper-tts
+      - name: Generer les voix
+        run: tools/voice/gen.sh voices_out
+      - name: Publier
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd voices_out && zip -q ../voices.zip *.wav && cd ..
+          gh release delete voices --yes --cleanup-tag || true
+          gh release create voices voices.zip --title "Voix arbitre (sources)" --notes "brut" --prerelease
