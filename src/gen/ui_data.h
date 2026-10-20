@@ -1,0 +1,59 @@
+/* genere par tools/art/build_ui.py */
+#ifndef _UI_DATA_H_
+#define _UI_DATA_H_
+
+#define HT_BLANK 0
+#define HT_BIG_PTS 1
+#define HT_BIG_TIME 23
+#define HT_BOX_PTS_TOP 45
+#define HT_BOX_PTS_BOT 46
+#define HT_BOX_PTS_FILL 47
+#define HT_BOX_TIME_TOP 48
+#define HT_BOX_TIME_BOT 49
+#define HT_BOX_TIME_FILL 50
+#define HT_ADV_LAB 51
+#define HT_ADV_DIG 52
+#define HT_PEN_LAB 62
+#define HT_PEN_DIG 63
+#define HT_FLAG_BRA 73
+#define HT_FLAG_JPN 77
+#define HT_FLAG_FRA 81
+#define HT_FLAG_SEN 85
+#define HT_FLAG_UKR 89
+#define HT_FLAG_ITA 93
+#define HT_FLAG_ALG 97
+#define HT_FLAG_HUN 101
+#define HT_FLAG_POR 105
+#define HT_FLAG_LBN 109
+#define HT_FLAG_CAN 113
+#define HT_FLAG_NOR 117
+#define HT_FLAG_MLI 121
+#define HT_FLAG_POL 125
+#define HT_BTN_A 129
+#define HT_BTN_B 130
+#define HT_BTN_C 131
+#define HT_SUB_EMPTY 132
+#define HT_SUB_ATT 133
+#define HT_SUB_DEF 134
+#define HT_SUB_BOTH 135
+#define HT_GATE_OFF 136
+#define HT_GATE_ON 137
+#define HT_BAR_CAPL 138
+#define HT_BAR_CAPR 139
+#define HT_PANEL 140
+#define HT_PANEL_TOP 141
+#define HT_PANEL_BOT 142
+#define HUD_TILE_COUNT 143
+
+enum { FLAG_BRA, FLAG_JPN, FLAG_FRA, FLAG_SEN, FLAG_UKR, FLAG_ITA, FLAG_ALG, FLAG_HUN, FLAG_POR, FLAG_LBN, FLAG_CAN, FLAG_NOR, FLAG_MLI, FLAG_POL, FLAG_COUNT };
+enum { BAN_OSS, BAN_COMBATE, BAN_FINALIZOU, BAN_TEMPO, BAN_VITORIA, BAN_EMPATE, BAN_DESCLASSIFICADO, BAN_PERFEITO, BAN_CAMPEAO, BAN_FINAL, BAN_PRONTO, BAN_PAROU, BANNER_COUNT };
+enum { POP_P2, POP_P3, POP_P4, POP_AV, POP_PEN, POP_M2, POP_OSS, POP_DANGER, POP_COUNT };
+enum { REF_IDLE, REF_WALK, REF_POINTS, REF_ADV, REF_PEN, REF_STOP, REF_START, REF_WINNER, REF_COUNT };
+static const u8 refFrames[REF_COUNT] = { 2, 4, 1, 1, 2, 1, 2, 1 };
+#define FX_IMPACT 0
+#define FX_DUST 4
+#define FX_SWEAT 8
+#define FX_SHADOW 10
+#define REF_X 48
+
+#endif

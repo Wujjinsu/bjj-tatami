@@ -1,99 +1,90 @@
 /*
- * BJJ TATAMI - le combat, facon "UFC" en 16 bits.
+ * BJJ TATAMI - le combat.
  *
- * DEBOUT
- *   B tenu (pres de l'adversaire) : prendre les prises du kimono (jauge PRISE)
- *   A        : double-leg        A + HAUT : projection judo (il faut des prises)
- *   A + BAS  : single-leg        B + BAS  : tirer la garde (il faut des prises)
- *   C        : sprawl (contre double / single)
- *   C + HAUT : bloquer la hanche (contre la projection judo)
- *
- * AU SOL : chaque position propose jusqu'a 3 transitions (A + direction) et 3 soumissions
- *   (B + direction). Directions : HAUT (ou rien), COTE (gauche/droite), BAS.
- *   L'attaque s'annonce ("ATTAQUE !") sans dire laquelle : le defenseur peut la bloquer
- *   en appuyant sur C + LA MEME direction avant qu'elle parte. C'est un jeu de lecture.
- *
- * SOUMISSION : 3 portes. Chacun deplace son curseur avec la croix ; l'attaquant doit
- *   couvrir le curseur du defenseur pour remplir la porte, le defenseur doit lui echapper.
- *
- * SOUFFLE / CARDIO : chaque effort coute du souffle ; le souffle ne remonte jamais
- *   au-dessus du cardio, qui baisse doucement pendant tout le combat.
+ * DEBOUT  : B tenu = prises du kimono ; A = double-leg, HAUT+A = projection judo (prises),
+ *           BAS+A = single-leg, BAS+B = tirer la garde (prises), C = sprawl, HAUT+C = bloquer la hanche.
+ * AU SOL  : A + direction = transition, B + direction = soumission ; C + meme direction = bloquer.
+ * SOUMISSION : 3 portes, chacun deplace son curseur (l'attaquant doit couvrir celui du defenseur).
+ * PENALITES : passivite et sortie de la zone ; 2e = avantage adverse, 3e = 2 points, 4e = disqualification.
  */
 #include "game.h"
 
-/* ------------------------------------------------------------------ constantes */
-#define FEET_Y          200
-#define STAND_Y         (FEET_Y - 46)
-#define GROUND_SPR_X    128
-#define GROUND_SPR_Y    (FEET_Y - 38)
-#define MIN_X           36
-#define MAX_X           284
-#define MIN_GAP         26
-#define REACH_SHOOT     46
-#define REACH_PULL      52
-#define REACH_GRIP      44
+/* ------------------------------------------------------------------ reglages */
+#define MIN_GAP         34
+#define REACH_GRIP      58
+#define REACH_SHOOT     72
+#define GAP_GRIP        46
+#define START_GAP       104
+#define STALL_FRAMES    1500
+#define BAR_CELLS       24
 
-#define ROW_HUD1        1
-#define ROW_HUD2        2
-#define ROW_HUD3        3
-#define ROW_INFO        9
-#define ROW_GAUGE       10
-#define ROW_MSG         11
-#define ROW_HINT        12
-
-#define BAR_CELLS       28
-#define STALL_FRAMES    1800
-
-enum { ANIM_IDLE, ANIM_WALK, ANIM_SHOOT, ANIM_SPRAWL };
 enum { POS_GUARD, POS_HALF, POS_SIDE, POS_KNEE, POS_MOUNT, POS_BACK, POS_COUNT };
-enum { PH_STAND, PH_GROUND, PH_SUB, PH_OVER };
-enum { ACT_IDLE, ACT_SHOOT, ACT_DEFEND, ACT_STUMBLE };
+enum { PH_INTRO, PH_STAND, PH_ANIM, PH_GROUND, PH_SUB, PH_TAP, PH_DECIDE, PH_OVER };
+enum { ACT_IDLE, ACT_SHOOT, ACT_JUDO, ACT_DEFEND, ACT_STUMBLE };
 enum { TD_DOUBLE, TD_JUDO, TD_SINGLE };
 enum { DEF_SPRAWL, DEF_HIP };
+enum { NX_NONE, NX_GROUND, NX_STAND, NX_SUB, NX_ESCAPE, NX_FIGHT };
+enum { DIR_UP, DIR_SIDE, DIR_DOWN };
 enum { PEND_MOVE, PEND_SUB };
 
-#define STANDUP (-1)
+#define STANDUP     (-1)
 
-typedef struct { const char* name; s8 target; u8 swap; u8 points; u8 adv; s8 diff; } Move;
-typedef struct { const char* name; u8 family; s8 diff; } SubMove;
+typedef struct { const char* name; s8 target; u8 swap; u8 points; u8 adv; s8 diff; u8 seq; } Move;
+typedef struct { const char* name; u8 family; s8 diff; u8 seq; } SubMove;
 
-#define MV(n, t, s, p, a, d)    { n, t, s, p, a, d }
-#define NOMV                    { NULL, 0, 0, 0, 0, 0 }
-#define SB(n, f, d)             { n, f, d }
-#define NOSB                    { NULL, 0, 0 }
+#define MV(n, t, s, p, a, d, q) { n, t, s, p, a, d, q }
+#define NOMV                    { NULL, 0, 0, 0, 0, 0, 0 }
+#define SB(n, f, d, q)          { n, f, d, q }
+#define NOSB                    { NULL, 0, 0, 0 }
 
-/* [position][direction HAUT, COTE, BAS] */
 static const Move topMoves[POS_COUNT][3] =
 {
-    { MV("OUVRIR LA GARDE", POS_HALF, 0, 0, 1, 0),   MV("PASSAGE TOREANDO", POS_SIDE, 0, 3, 0, 3),  MV("SE RELEVER", STANDUP, 0, 0, 0, -1) },
-    { MV("PASSAGE", POS_SIDE, 0, 3, 0, 1),           MV("PASSAGE MONTEE", POS_MOUNT, 0, 7, 0, 4),   MV("SE RELEVER", STANDUP, 0, 0, 0, 0) },
-    { MV("MONTEE", POS_MOUNT, 0, 4, 0, 1),           MV("GENOU AU VENTRE", POS_KNEE, 0, 2, 0, 0),   MV("PRISE DE DOS", POS_BACK, 0, 4, 0, 3) },
-    { MV("MONTEE", POS_MOUNT, 0, 4, 0, 0),           NOMV,                                          MV("RETOUR 100 KILOS", POS_SIDE, 0, 0, 0, -2) },
-    { MV("PRISE DE DOS", POS_BACK, 0, 4, 0, 1),      NOMV,                                          NOMV },
-    { NOMV,                                          NOMV,                                          NOMV },
+    { MV("OUVRIR LA GARDE", POS_HALF, 0, 0, 1, 0, SEQ_T_GUARD_HALF),
+      MV("PASSAGE TOREANDO", POS_SIDE, 0, 3, 0, 3, SEQ_T_GUARD_SIDE),
+      MV("SE RELEVER", STANDUP, 0, 0, 0, -1, SEQ_T_GUARD_STAND) },
+    { MV("PASSAGE DE GARDE", POS_SIDE, 0, 3, 0, 1, SEQ_T_HALF_SIDE),
+      MV("PASSAGE MONTEE", POS_MOUNT, 0, 7, 0, 4, SEQ_T_HALF_MOUNT),
+      MV("SE RELEVER", STANDUP, 0, 0, 0, 0, SEQ_T_HALF_STAND) },
+    { MV("MONTEE", POS_MOUNT, 0, 4, 0, 1, SEQ_T_SIDE_MOUNT),
+      MV("GENOU AU VENTRE", POS_KNEE, 0, 2, 0, 0, SEQ_T_SIDE_KNEE),
+      MV("PRISE DE DOS", POS_BACK, 0, 4, 0, 3, SEQ_T_SIDE_BACK) },
+    { MV("MONTEE", POS_MOUNT, 0, 4, 0, 0, SEQ_T_KNEE_MOUNT),
+      NOMV,
+      MV("RETOUR 100 KILOS", POS_SIDE, 0, 0, 0, -2, SEQ_T_KNEE_SIDE) },
+    { MV("PRISE DE DOS", POS_BACK, 0, 4, 0, 1, SEQ_T_MOUNT_BACK), NOMV, NOMV },
+    { NOMV, NOMV, NOMV },
 };
 static const Move botMoves[POS_COUNT][3] =
 {
-    { MV("BALAYAGE CISEAUX", POS_HALF, 1, 2, 0, 1),  MV("PRISE DE DOS", POS_BACK, 1, 4, 0, 4),      MV("SE RELEVER", STANDUP, 0, 0, 0, 0) },
-    { MV("REPRENDRE GARDE", POS_GUARD, 0, 0, 0, -1), MV("BALAYAGE", POS_HALF, 1, 2, 0, 2),          MV("SE RELEVER", STANDUP, 0, 0, 0, 1) },
-    { MV("SORTIE DE HANCHE", POS_HALF, 0, 0, 0, 0),  MV("REPRENDRE GARDE", POS_GUARD, 0, 0, 0, 2),  NOMV },
-    { MV("SORTIE", POS_HALF, 0, 0, 0, 0),            NOMV,                                          NOMV },
-    { MV("UPA", POS_GUARD, 1, 0, 0, 1),              MV("COUDE-GENOU", POS_HALF, 0, 0, 0, 0),       NOMV },
-    { MV("SE RETOURNER", POS_GUARD, 1, 0, 0, 1),     MV("GLISSER AU SOL", POS_HALF, 0, 0, 0, 0),    NOMV },
+    { MV("BALAYAGE CISEAUX", POS_HALF, 1, 2, 0, 1, SEQ_B_GUARD_SWEEP),
+      MV("PRISE DE DOS", POS_BACK, 1, 4, 0, 4, SEQ_B_GUARD_BACK),
+      MV("SE RELEVER", STANDUP, 0, 0, 0, 0, SEQ_B_GUARD_STAND) },
+    { MV("REPRENDRE LA GARDE", POS_GUARD, 0, 0, 0, -1, SEQ_B_HALF_GUARD),
+      MV("BALAYAGE", POS_HALF, 1, 2, 0, 2, SEQ_B_HALF_SWEEP),
+      MV("SE RELEVER", STANDUP, 0, 0, 0, 1, SEQ_B_HALF_STAND) },
+    { MV("SORTIE DE HANCHE", POS_HALF, 0, 0, 0, 0, SEQ_B_SIDE_HALF),
+      MV("REPRENDRE LA GARDE", POS_GUARD, 0, 0, 0, 2, SEQ_B_SIDE_GUARD), NOMV },
+    { MV("SORTIE", POS_HALF, 0, 0, 0, 0, SEQ_B_KNEE_HALF), NOMV, NOMV },
+    { MV("UPA", POS_GUARD, 1, 0, 0, 1, SEQ_B_MOUNT_UPA),
+      MV("COUDE-GENOU", POS_HALF, 0, 0, 0, 0, SEQ_B_MOUNT_HALF), NOMV },
+    { MV("SE RETOURNER", POS_GUARD, 1, 0, 0, 1, SEQ_B_BACK_ROLL),
+      MV("GLISSER AU SOL", POS_HALF, 0, 0, 0, 0, SEQ_B_BACK_HALF), NOMV },
 };
+/* seq = index de la sequence _SET (LOCK = +1, TAP = +2) */
 static const SubMove topSubs[POS_COUNT][3] =
 {
-    { NOSB,                               NOSB,                                 SB("CLE DE CHEVILLE", SUBF_LEG, 2) },
-    { SB("KIMURA", SUBF_KIM, 1),          SB("ETRANGL. D'ARCE", SUBF_CHOKE, 2), NOSB },
-    { SB("KIMURA", SUBF_KIM, 0),          SB("AMERICANA", SUBF_ARM, 1),         NOSB },
-    { SB("CLE DE BRAS", SUBF_ARM, 0),     NOSB,                                 NOSB },
-    { SB("CLE DE BRAS", SUBF_ARM, -1),    SB("ETRANGL. CROISE", SUBF_CHOKE, 0), NOSB },
-    { SB("MATA LEAO", SUBF_CHOKE, -2),    SB("ARC ET FLECHE", SUBF_CHOKE, -1),  NOSB },
+    { NOSB, NOSB, SB("CLE DE CHEVILLE", SUBF_LEG, 2, SEQ_S_ANKLE_SET) },
+    { SB("KIMURA", SUBF_KIM, 1, SEQ_S_KIMURA_H_SET), SB("ETRANGLEMENT D'ARCE", SUBF_CHOKE, 2, SEQ_S_DARCE_SET), NOSB },
+    { SB("KIMURA", SUBF_KIM, 0, SEQ_S_KIMURA_S_SET), SB("AMERICANA", SUBF_ARM, 1, SEQ_S_AMERICANA_SET), NOSB },
+    { SB("CLE DE BRAS", SUBF_ARM, 0, SEQ_S_ARMBAR_K_SET), NOSB, NOSB },
+    { SB("CLE DE BRAS", SUBF_ARM, -1, SEQ_S_ARMBAR_M_SET), SB("ETRANGLEMENT CROISE", SUBF_CHOKE, 0, SEQ_S_CROSS_SET), NOSB },
+    { SB("MATA LEAO", SUBF_CHOKE, -2, SEQ_S_RNC_SET), SB("ARC ET FLECHE", SUBF_CHOKE, -1, SEQ_S_BOWARROW_SET), NOSB },
 };
 static const SubMove botSubs[POS_COUNT][3] =
 {
-    { SB("TRIANGLE", SUBF_TRI, 1),        SB("CLE DE BRAS", SUBF_ARM, 1),       SB("GUILLOTINE", SUBF_CHOKE, 2) },
-    { SB("KIMURA", SUBF_KIM, 2),          NOSB,                                 NOSB },
+    { SB("TRIANGLE", SUBF_TRI, 1, SEQ_S_TRIANGLE_SET), SB("CLE DE BRAS", SUBF_ARM, 1, SEQ_S_ARMBAR_G_SET),
+      SB("GUILLOTINE", SUBF_CHOKE, 2, SEQ_S_GUILLOTINE_SET) },
+    { SB("KIMURA", SUBF_KIM, 2, SEQ_S_KIMURA_HB_SET), NOSB, NOSB },
     { NOSB, NOSB, NOSB }, { NOSB, NOSB, NOSB }, { NOSB, NOSB, NOSB }, { NOSB, NOSB, NOSB },
 };
 
@@ -102,259 +93,123 @@ static const char* const posName[POS_COUNT] =
 static const char* const tdName[3] = { "DOUBLE-LEG", "PROJECTION JUDO", "SINGLE-LEG" };
 static const char dirChar[3] = { '^', '>', 'v' };
 
-/* ------------------------------------------------------------------ etat */
-Sprite* groundSpr;
+static const u16 cpuDeny[3]   = { 22, 40, 58 };
+static const u16 cpuRead[3]   = { 50, 62, 75 };
+static const u16 cpuReact[3]  = { 16, 11, 7 };
+static const u16 cpuEscape[3] = { 10, 7, 5 };
 
+/* ------------------------------------------------------------------ etat */
 static u16 phase;
 static s32 matchFrames;
+static s16 phaseTimer;
 static u16 pos, top;
-static s16 msgTimer, overTimer;
-static bool hudDirty;
+static bool flip;
+static s16 anchor;
+static u16 next, nextPos;
 
-/* attaque en preparation (sol) */
+/* attaque au sol */
 static bool pend;
 static u16 pendWho, pendKind, pendDir;
 static s16 pendTimer;
 static bool pendDenyUsed;
+static s16 groundCd[2];
 
 /* soumission */
-static u16 subWho, subFam;
-static s8 subDiff;
-static const char* subNameStr;
+static u16 subWho;
+static const SubMove* subM;
 static u16 gate;
-static s16 tug;
-static s16 lenA, lenD;
-
-#ifdef SIM_STATS
-long statSubStart[2], statSubWin[2], statMove[2], statMoveOk[2], statDeny[2];
-#define STATINC(x) (x)++
-#else
-#define STATINC(x)
-#endif
-
-static const u16 cpuDeny[3]   = { 22, 40, 58 };
-static const u16 cpuRead[3]   = { 50, 62, 75 };
-static const u16 cpuReact[3]  = { 16, 11, 7 };      /* CPU qui attaque (soumission) */
-static const u16 cpuEscape[3] = { 10, 7, 5 };       /* CPU qui defend (soumission) */
+static s16 tug, lenA, lenD;
 
 #define STAT(i, s)  ((s16)P[i].def->stat[s])
 #define OPP(i)      (1 - (i))
 
-/* ------------------------------------------------------------------ messages */
-static void message(const char* s)
-{
-    txtCenter(s, ROW_MSG, TXT_DARK);
-    msgTimer = 120;
-}
-
-static void msgWho(u16 who, const char* s)
-{
-    char b[41];
-    u16 n = 0;
-    const char* p = P[who].label;
-    while (*p && n < 38) b[n++] = *p++;
-    b[n++] = ' '; b[n++] = ':'; b[n++] = ' ';
-    while (*s && n < 40) b[n++] = *s++;
-    b[n] = 0;
-    message(b);
-}
-
-static void msgWhoPts(u16 who, const char* s, u16 pts)
-{
-    char b[32];
-    u16 n = 0;
-    while (*s && n < 24) b[n++] = *s++;
-    if (pts)
-    {
-        b[n++] = ' '; b[n++] = '+';
-        if (pts >= 10) b[n++] = '0' + pts / 10;
-        b[n++] = '0' + pts % 10;
-    }
-    b[n] = 0;
-    msgWho(who, b);
-}
-
-/* ------------------------------------------------------------------ souffle / cardio */
+/* ------------------------------------------------------------------ outils */
 static void spend(u16 i, s16 amount)
 {
     s16 c = P[i].def->stat[ST_CARDIO];
     P[i].souffle -= amount;
     if (P[i].souffle < 0) P[i].souffle = 0;
-    /* le cardio baisse un peu a chaque effort, moins pour les gros cardios */
-    P[i].cardio -= (amount * (11 - c)) / 40 + 0;
+    P[i].cardio -= (amount * (11 - c)) / 40;
     if (P[i].cardio < 30) P[i].cardio = 30;
-    hudDirty = TRUE;
 }
 
 static void regen(u16 i, u16 every)
 {
-    if ((frameCount % every) == 0 && P[i].souffle < P[i].cardio)
+    if ((frameCount % every) == 0 && P[i].souffle < P[i].cardio) P[i].souffle++;
+}
+
+static u16 dirOf(u16 i)
+{
+    u16 p = P[i].pad;
+    if (p & BUTTON_DOWN) return DIR_DOWN;
+    if (p & (BUTTON_LEFT | BUTTON_RIGHT)) return DIR_SIDE;
+    return DIR_UP;
+}
+
+static s16 dist(void) { s16 d = P[1].x - P[0].x; return d < 0 ? -d : d; }
+
+static void headPos(u16 i, s16* x, s16* y)
+{
+    if (phase == PH_STAND || phase == PH_INTRO || phase == PH_OVER)
     {
-        P[i].souffle++;
-        if ((P[i].souffle % 10) == 0) hudDirty = TRUE;
+        *x = P[i].x;
+        *y = FLOOR_SCREEN - 104;
+        return;
+    }
+    actorsPairWorldPos(i == top ? 0 : 1, x, y);
+    *y -= 30;
+}
+
+static void popAt(u16 who, u16 kind)
+{
+    s16 x, y;
+    headPos(who, &x, &y);
+    fxPop(kind, x, y);
+}
+
+static void award(u16 who, u16 pts, u16 adv)
+{
+    P[who].points += pts;
+    P[who].adv += adv;
+    if (pts)
+    {
+        s16 x, y;
+        headPos(who, &x, &y);
+        popAt(who, pts == 2 ? POP_P2 : (pts == 3 ? POP_P3 : POP_P4));
+        refSignal(REF_POINTS, x, 70);
+        crowdReact(FALSE);
+        stageCheer(120);
+    }
+    else if (adv)
+    {
+        s16 x, y;
+        headPos(who, &x, &y);
+        popAt(who, POP_AV);
+        refSignal(REF_ADV, x, 60);
     }
 }
 
-/* ------------------------------------------------------------------ HUD */
-static void bar10(s16 souffle, s16 cardio, char* out)
+static void endMatch(s16 winner, const char* method, bool bySub, u16 ban);
+
+static void penalty(u16 i, const char* why)
 {
-    u16 k;
-    out[0] = '[';
-    for (k = 0; k < 10; k++)
-    {
-        s16 lim = (k + 1) * 10;
-        out[1 + k] = (souffle >= lim - 5) ? '#' : (cardio >= lim - 5) ? '-' : ' ';
-    }
-    out[11] = ']';
-    out[12] = 0;
+    s16 x, y;
+    P[i].pen++;
+    P[i].idle = 0;
+    headPos(i, &x, &y);
+    popAt(i, POP_PEN);
+    refSignal(REF_PEN, x, 80);
+    hudMessageWho(i, why, 0);
+    sfx(200, 14);
+    if (P[i].pen == 2) P[OPP(i)].adv++;
+    if (P[i].pen == 3) P[OPP(i)].points += 2;
+    if (P[i].pen >= 4) endMatch(OPP(i), "DISQUALIFICATION", FALSE, BAN_DESCLASSIFICADO);
 }
 
-static void put(char* line, u16 x, const char* s)
-{
-    while (*s && x < 40) line[x++] = *s++;
-}
-
-/* le HUD est reecrit en entier (sans effacer avant) : pas de clignotement */
-static void drawHud(void)
-{
-    char line[41], b[16];
-    s32 secs = (matchFrames + 59) / 60;
-    u16 k;
-
-    for (k = 0; k < 40; k++) line[k] = ' ';
-    line[40] = 0;
-    put(line, 1, P[0].label);
-    numStr(P[0].points, 2, b); put(line, 9, b);          /* chiffres deja la : pas de trou */
-    numStr(P[1].points, 2, b); put(line, 29, b);
-    put(line, 12, "A"); numStr(P[0].adv, 1, b); put(line, 13, b);
-    put(line, 15, "P"); numStr(P[0].pen, 1, b); put(line, 16, b);
-    numStr((s16)(secs / 60), 1, b); put(line, 18, b);
-    put(line, 19, ":");
-    numStr((s16)(secs % 60), 2, b); put(line, 20, b);
-    put(line, 23, "P"); numStr(P[1].pen, 1, b); put(line, 24, b);
-    put(line, 26, "A"); numStr(P[1].adv, 1, b); put(line, 27, b);
-    put(line, 39 - slen(P[1].label), P[1].label);
-    txt(line, 0, ROW_HUD1, TXT_DARK);
-    drawNum(P[0].points, 2, 9, ROW_HUD1, TXT_RED);
-    drawNum(P[1].points, 2, 29, ROW_HUD1, TXT_RED);
-
-    for (k = 0; k < 40; k++) line[k] = ' ';
-    bar10(P[0].souffle, P[0].cardio, b); put(line, 1, b);
-    bar10(P[1].souffle, P[1].cardio, b); put(line, 27, b);
-    txt(line, 0, ROW_HUD2, TXT_DARK);
-
-    /* jauges de prises (debout) : "PR #####" a gauche et a droite, hors de la banniere */
-    for (k = 0; k < 40; k++) line[k] = ' ';
-    txt(line, 0, ROW_HUD3, TXT_DARK);
-    if (phase == PH_STAND)
-    {
-        u16 i;
-        for (i = 0; i < 2; i++)
-        {
-            if (P[i].grip < 10) continue;
-            b[0] = 'P'; b[1] = 'R'; b[2] = ' ';
-            for (k = 0; k < 5; k++) b[3 + k] = (P[i].grip >= (k + 1) * 20 - 10) ? '#' : '-';
-            b[8] = 0;
-            txt(b, (i == 0) ? 1 : 31, ROW_HUD3, (P[i].grip >= 50) ? TXT_RED : TXT_DARK);
-        }
-    }
-    hudDirty = FALSE;
-}
-
-/* ------------------------------------------------------------------ sprites */
-static s16 dirTo(u16 i) { return (P[OPP(i)].x > P[i].x) ? 1 : -1; }
-static s16 dist(void)   { s16 d = P[1].x - P[0].x; return (d < 0) ? -d : d; }
-
-void updateFighterSprite(u16 i, s16 y)
-{
-    Player* f = &P[i];
-    s16 anim = ANIM_IDLE, frame = (frameCount / 30) & 1;
-
-    switch (f->act)
-    {
-        case ACT_SHOOT:   anim = ANIM_SHOOT;  frame = (f->actTimer < 12) ? 0 : 1; break;
-        case ACT_DEFEND:  anim = ANIM_SPRAWL; frame = (f->actTimer / 8) & 1;      break;
-        case ACT_STUMBLE: anim = ANIM_SHOOT;  frame = 0;                          break;
-        default:
-            if (f->walking) { anim = ANIM_WALK; frame = (f->walkTick / 8) & 1; }
-            break;
-    }
-    SPR_setAnimAndFrame(f->spr, anim, frame);
-    SPR_setHFlip(f->spr, dirTo(i) < 0);
-    SPR_setPosition(f->spr, f->x - 16, y);
-}
-
-static void showStanding(bool show)
-{
-    SPR_setVisibility(P[0].spr, show ? VISIBLE : HIDDEN);
-    SPR_setVisibility(P[1].spr, show ? VISIBLE : HIDDEN);
-    SPR_setVisibility(groundSpr, show ? HIDDEN : VISIBLE);
-}
-
-/* ------------------------------------------------------------------ fin du combat */
-static void endMatch(s16 winner, const char* method)
-{
-    phase = PH_OVER;
-    overTimer = 210;
-    pend = FALSE;
-    resWinner = winner;
-    scopy(resMethod, method, 31);
-    clearRows(ROW_INFO, ROW_HINT + 2);
-    if (winner >= 0)
-    {
-        char b[41];
-        u16 n = 0;
-        const char* p = P[winner].label;
-        while (*p && n < 30) b[n++] = *p++;
-        p = " GAGNE !";
-        while (*p) b[n++] = *p++;
-        b[n] = 0;
-        txtCenter(b, ROW_INFO + 1, TXT_RED);
-    }
-    else txtCenter("EGALITE !", ROW_INFO + 1, TXT_RED);
-    txtCenter(method, ROW_INFO + 2, TXT_DARK);
-    crowdReact(TRUE);
-    if (winner >= 0 && (P[winner].human || numHumans == 0)) playTune(tuneWin, 6);
-    else playTune(tuneLose, 4);
-    hudDirty = TRUE;
-}
-
-static void timeUp(void)
-{
-    char b[24];
-    s16 w = -1;
-    const char* how = "DECISION DES ARBITRES";
-
-    if (P[0].points != P[1].points)
-    {
-        char n0[4], n1[4];
-        u16 k = 0;
-        const char* q = "AUX POINTS ";
-        w = (P[0].points > P[1].points) ? 0 : 1;
-        numStr(P[w].points, 2, n0);
-        numStr(P[OPP(w)].points, 2, n1);
-        while (*q) b[k++] = *q++;
-        b[k++] = n0[0]; b[k++] = n0[1]; b[k++] = '-'; b[k++] = n1[0]; b[k++] = n1[1]; b[k] = 0;
-        how = b;
-    }
-    else if (P[0].adv != P[1].adv) { w = (P[0].adv > P[1].adv) ? 0 : 1; how = "AUX AVANTAGES"; }
-    else if (P[0].pen != P[1].pen) { w = (P[0].pen < P[1].pen) ? 0 : 1; how = "AUX PENALITES"; }
-    else if (P[0].attempts != P[1].attempts) w = (P[0].attempts > P[1].attempts) ? 0 : 1;
-    else how = "MATCH NUL";
-    endMatch(w, how);
-}
-
-/* ------------------------------------------------------------------ penalites (passivite) */
 static void stallCheck(u16 i)
 {
     if (++P[i].idle < STALL_FRAMES) return;
-    P[i].idle = 0;
-    P[i].pen++;
-    if (P[i].pen == 2) P[OPP(i)].adv++;
-    if (P[i].pen >= 3) P[OPP(i)].points += 2;
-    msgWho(i, "PENALITE (PASSIVITE)");
-    sfx(200, 12);
-    hudDirty = TRUE;
+    penalty(i, "PENALITE : PASSIVITE");
 }
 
 static void acted(u16 i)
@@ -363,71 +218,309 @@ static void acted(u16 i)
     P[i].attempts++;
 }
 
-/* ==================================================================== DEBOUT */
+/* ------------------------------------------------------------------ aides */
 static void standHints(void)
 {
-    clearRows(ROW_INFO, ROW_HINT + 2);
-    if (!P[0].human || numHumans == 2) return;
-    txt("A DOUBLE-LEG  ^A JUDO   vA SINGLE-LEG", 1, ROW_HINT, TXT_DARK);
-    txt("B PRISES (TENIR)    vB TIRER LA GARDE", 1, ROW_HINT + 1, TXT_DARK);
-    txt("C SPRAWL      ^C BLOQUER LA HANCHE", 1, ROW_HINT + 2, TXT_DARK);
+    static const char* const h[3] = {
+        "@A DOUBLE-LEG  ^@A JUDO   v@A SINGLE-LEG",
+        "@B PRISES (TENIR)    v@B TIRER LA GARDE",
+        "@C SPRAWL      ^@C BLOQUER LA HANCHE" };
+    if (!helpOn || !P[0].human || numHumans != 1) { hudClearHints(); return; }
+    hudHints(h, 3);
 }
 
-static void enterStand(s16 cx)
+static const Move* moveFor(u16 who, u16 d)
+{
+    const Move* m = (who == top) ? &topMoves[pos][d] : &botMoves[pos][d];
+    return m->name ? m : NULL;
+}
+
+static const SubMove* subFor(u16 who, u16 d)
+{
+    const SubMove* s = (who == top) ? &topSubs[pos][d] : &botSubs[pos][d];
+    return s->name ? s : NULL;
+}
+
+static void groundHints(void)
+{
+    static char lines[3][41];
+    static const char* ptr[3];
+    u16 d, n = 0;
+    char b[41];
+
+    b[0] = 0;
+    scat(b, P[top].label, 40);
+    scat(b, " DESSUS - ", 40);
+    scat(b, posName[pos], 40);
+    wtxtC(b, 7);
+    if (!helpOn || !P[0].human || numHumans != 1) { hudClearHints(); return; }
+    for (d = 0; d < 3; d++)
+    {
+        const Move* m = moveFor(0, d);
+        const SubMove* s = subFor(0, d);
+        char* l = lines[n];
+        u16 k;
+        if (!m && !s) continue;
+        for (k = 0; k < 40; k++) l[k] = ' ';
+        l[40] = 0;
+        l[0] = dirChar[d];
+        if (m) { l[1] = '@'; l[2] = 'A'; for (k = 0; m->name[k] && k < 16; k++) l[4 + k] = m->name[k]; }
+        if (s) { l[21] = '@'; l[22] = 'B'; for (k = 0; s->name[k] && k < 16; k++) l[24 + k] = s->name[k]; }
+        ptr[n] = l;
+        n++;
+    }
+    if (n) hudHints(ptr, n);
+    else hudClearHints();
+}
+
+/* ------------------------------------------------------------------ fin de combat */
+static void endMatch(s16 winner, const char* method, bool bySub, u16 ban)
+{
+    if (phase == PH_DECIDE || phase == PH_OVER) return;
+    resWinner = winner;
+    scopy(resMethod, method, 31);
+    resBySub = bySub;
+    resTimeLeft = (s16)(matchFrames / 60);
+    phase = PH_DECIDE;
+    phaseTimer = 150;
+    pend = FALSE;
+    hudSubClear();
+    hudClearHints();
+    clearRow(7);
+    fxBanner(ban, 150);
+    crowdReact(TRUE);
+    stageCheer(300);
+    refSignal(REF_STOP, (P[0].x + P[1].x) / 2, 100);
+}
+
+static void timeUp(void)
+{
+    char b[24];
+    s16 w = -1;
+    const char* how = "DECISION DES ARBITRES";
+    if (P[0].points != P[1].points)
+    {
+        char n0[4], n1[4];
+        w = (P[0].points > P[1].points) ? 0 : 1;
+        numStr(P[w].points, 2, n0);
+        numStr(P[OPP(w)].points, 2, n1);
+        b[0] = 0;
+        scat(b, "AUX POINTS ", 23);
+        scat(b, n0, 23);
+        scat(b, "-", 23);
+        scat(b, n1, 23);
+        how = b;
+    }
+    else if (P[0].adv != P[1].adv) { w = (P[0].adv > P[1].adv) ? 0 : 1; how = "AUX AVANTAGES"; }
+    else if (P[0].pen != P[1].pen) { w = (P[0].pen < P[1].pen) ? 0 : 1; how = "AUX PENALITES"; }
+    else if (P[0].attempts != P[1].attempts) w = (P[0].attempts > P[1].attempts) ? 0 : 1;
+    else how = "MATCH NUL";
+    endMatch(w, how, FALSE, BAN_TEMPO);
+}
+
+/* passage a l'image finale : vainqueur debout, arbitre qui leve son bras */
+static void startOutro(void)
 {
     u16 i;
-    phase = PH_STAND;
-    pend = FALSE;
-    if (cx < MIN_X + 44) cx = MIN_X + 44;
-    if (cx > MAX_X - 44) cx = MAX_X - 44;
-    P[0].x = cx - 44;
-    P[1].x = cx + 44;
+    s16 cx;
+    if (phase != PH_STAND && phase != PH_INTRO)
+    {
+        s16 x0, y0, x1, y1;
+        actorsPairWorldPos(0, &x0, &y0);
+        actorsPairWorldPos(1, &x1, &y1);
+        cx = (x0 + x1) / 2;
+    }
+    else cx = (P[0].x + P[1].x) / 2;
+    if (cx < MAT_MIN + 60) cx = MAT_MIN + 60;
+    if (cx > MAT_MAX - 60) cx = MAT_MAX - 60;
+    phase = PH_OVER;
+    phaseTimer = 260;
+    actorsSoloMode();
+    P[0].x = cx - 30;
+    P[1].x = cx + 30;
+    P[0].dir = 1;
+    P[1].dir = -1;
     for (i = 0; i < 2; i++)
     {
-        P[i].act = ACT_IDLE;
-        P[i].actTimer = 0;
-        P[i].cooldown = 30;
-        P[i].grip = 0;
-        P[i].walking = FALSE;
-        P[i].aiWant = 0;
-        P[i].aiTimer = 30;
-        updateFighterSprite(i, STAND_Y);
+        P[i].animRev = FALSE;
+        if (resWinner < 0) actorsSoloSet(i, SOLO_IDLE, TRUE);
+        else actorsSoloSet(i, (s16)i == resWinner ? SOLO_VICTORY : SOLO_DEFEAT, TRUE);
     }
-    showStanding(TRUE);
-    standHints();
-    hudDirty = TRUE;
+    if (resWinner >= 0)
+    {
+        refSignal(REF_WINNER, P[resWinner].x, 250);
+        fxBanner(BAN_VITORIA, 200);
+        if (P[resWinner].human || numHumans == 0) playTune(tuneWin, 6);
+        else playTune(tuneLose, 4);
+    }
+    else
+    {
+        fxBanner(BAN_EMPATE, 200);
+        playTune(tuneLose, 4);
+    }
+    refFollow(cx);
+    stageSetCamera(cx);
 }
 
-static void enterGround(u16 p, u16 newTop);
+/* ------------------------------------------------------------------ sequences en paire */
+static void playSeq(u16 seq, u16 roleA, bool rev, u16 nx)
+{
+    actorsPairStart(seq, anchor, flip, roleA, rev);
+    phase = PH_ANIM;
+    next = nx;
+    hudClearHints();
+}
 
-static void moveFighter(u16 i, s16 dx, s16 gap)
+static void enterGround(void)
+{
+    u16 i;
+    phase = PH_GROUND;
+    pend = FALSE;
+    actorsPairStart(SEQ_G_GUARD + pos, anchor, flip, top, FALSE);
+    for (i = 0; i < 2; i++)
+    {
+        groundCd[i] = 30;
+        P[i].aiWant = 0;
+        P[i].aiDenyAt = 0;
+        P[i].aiTimer = 50 + (random() % 50);
+        P[i].grip = 0;
+    }
+    groundHints();
+    refFollow(anchor);
+}
+
+static void standFromPair(void)
+{
+    s16 x, y;
+    u16 a = actorsPairFlip() ? 1 : 0;
+    u16 roleA = top;
+    (void)a;
+    actorsPairWorldPos(0, &x, &y);
+    P[roleA].x = x;
+    actorsPairWorldPos(1, &x, &y);
+    P[OPP(roleA)].x = x;
+}
+
+static void enterStand(void)
+{
+    u16 i;
+    s16 cx = (P[0].x + P[1].x) / 2;
+    phase = PH_STAND;
+    pend = FALSE;
+    actorsSoloMode();
+    if (dist() < START_GAP - 30)
+    {
+        s16 l = (P[0].x < P[1].x) ? 0 : 1;
+        P[l].x = cx - 36;
+        P[OPP(l)].x = cx + 36;
+    }
+    for (i = 0; i < 2; i++)
+    {
+        if (P[i].x < MAT_MIN) P[i].x = MAT_MIN;
+        if (P[i].x > MAT_MAX) P[i].x = MAT_MAX;
+        P[i].act = ACT_IDLE;
+        P[i].cooldown = 30;
+        P[i].grip = 0;
+        P[i].aiWant = 0;
+        P[i].aiTimer = 30;
+        P[i].animRev = FALSE;
+        actorsSoloSet(i, SOLO_IDLE, TRUE);
+    }
+    P[0].dir = (P[0].x < P[1].x) ? 1 : -1;
+    P[1].dir = -P[0].dir;
+    standHints();
+    clearRow(7);
+}
+
+static void seqDone(void)
+{
+    const PairSeq* s = &pairSeqs[actorsPairSeq()];
+    bool rev = FALSE;
+    (void)rev;
+    switch (next)
+    {
+        case NX_GROUND:
+            if (s->endFlip) flip = !flip;
+            if (s->swap) top = OPP(top);
+            pos = nextPos;
+            enterGround();
+            break;
+        case NX_STAND:
+            standFromPair();
+            enterStand();
+            break;
+        case NX_FIGHT:
+            standFromPair();
+            enterStand();
+            fxBanner(BAN_COMBATE, 90);
+            refSignal(REF_START, (P[0].x + P[1].x) / 2, 40);
+            sfx(880, 10);
+            break;
+        case NX_SUB:
+            phase = PH_SUB;
+            actorsPairStart(subM->seq + 1, anchor, flip, top, FALSE);
+            break;
+        case NX_ESCAPE:
+            enterGround();
+            break;
+    }
+}
+
+/* ==================================================================== DEBOUT */
+static void moveFighter(u16 i, s16 dx)
 {
     s16 nx = P[i].x + dx;
     s16 ox = P[OPP(i)].x;
-    s16 dn, d0;
-
-    if (nx < MIN_X) nx = MIN_X;
-    if (nx > MAX_X) nx = MAX_X;
-    dn = nx - ox; if (dn < 0) dn = -dn;
-    d0 = P[i].x - ox; if (d0 < 0) d0 = -d0;
-    if (dn < gap && dn < d0) return;
+    s16 dn = nx - ox, d0 = P[i].x - ox;
+    if (dn < 0) dn = -dn;
+    if (d0 < 0) d0 = -d0;
+    if (dn < MIN_GAP && dn < d0) return;
     if ((P[i].x < ox) != (nx < ox)) return;
-    if (nx == P[i].x) return;
+    if (nx < MAT_MIN || nx > MAT_MAX)
+    {
+        /* recule hors de la zone : fuite */
+        if (dn > d0)
+        {
+            P[i].idle += 25;
+            if (P[i].idle >= STALL_FRAMES)
+            {
+                penalty(i, "PENALITE : SORTIE DE ZONE");
+                P[0].x = WORLD_W / 2 - START_GAP / 2;
+                P[1].x = WORLD_W / 2 + START_GAP / 2;
+            }
+        }
+        return;
+    }
     P[i].x = nx;
-    P[i].walking = TRUE;
-    P[i].walkTick++;
+}
+
+static void soloFor(u16 i, u16 anim, bool rev)
+{
+    P[i].animRev = rev;
+    actorsSoloSet(i, anim, FALSE);
 }
 
 static void startShoot(u16 i, u16 type)
 {
-    if (type == TD_JUDO && P[i].grip < 40)
+    if (type == TD_JUDO)
     {
-        msgWho(i, "PAS ASSEZ DE PRISES !");
-        P[i].cooldown = 20;
-        return;
+        if (P[i].grip < 40 || dist() > REACH_GRIP)
+        {
+            hudMessageWho(i, "PAS ASSEZ DE PRISES !", 0);
+            P[i].cooldown = 20;
+            return;
+        }
+        P[i].act = ACT_JUDO;
+        P[i].actTimer = 18;
+        popAt(i, POP_DANGER);
+        soloFor(i, SOLO_GRIP_HOLD, FALSE);
     }
-    P[i].act = ACT_SHOOT;
-    P[i].actTimer = 0;
+    else
+    {
+        P[i].act = ACT_SHOOT;
+        soloFor(i, SOLO_SHOOT, FALSE);
+        actorsSoloSet(i, SOLO_SHOOT, TRUE);
+    }
     P[i].tdType = type;
     spend(i, 10);
     acted(i);
@@ -437,65 +530,92 @@ static void startShoot(u16 i, u16 type)
 static void startDefend(u16 i, u16 kind)
 {
     P[i].act = ACT_DEFEND;
-    P[i].actTimer = 0;
     P[i].defKind = kind;
+    P[i].defTimer = 26;
     spend(i, 4);
+    soloFor(i, kind == DEF_HIP ? SOLO_HIPBLOCK : SOLO_SPRAWL, FALSE);
+    actorsSoloSet(i, kind == DEF_HIP ? SOLO_HIPBLOCK : SOLO_SPRAWL, TRUE);
+}
+
+/* point de depart d'une sequence de projection : ancre et miroir */
+static void setupStandingPair(u16 att, u16 seq, bool fromShoot)
+{
+    const PairFrame* f0 = &pairSeqs[seq].f[0];
+    s16 ax;
+    flip = P[att].x < P[OPP(att)].x;            /* canonique : l'attaquant est a droite */
+    if (fromShoot)
+    {
+        const SoloAnim* a = &soloAnims[SOLO_SHOOT];
+        ax = P[att].x + a->f[a->n - 1].dx * P[att].dir;
+        anchor = flip ? ax + (f0->ax - PAIR_AX) : ax - (f0->ax - PAIR_AX);
+    }
+    else anchor = (P[0].x + P[1].x) / 2;
+    if (anchor < 100) anchor = 100;
+    if (anchor > WORLD_W - 100) anchor = WORLD_W - 100;
+    top = att;
 }
 
 static void resolveShoot(u16 att)
 {
     u16 def = OPP(att);
+    u16 type = P[att].tdType;
     s16 chance;
+    bool ok;
+    u16 seqOk, seqKo;
 
-    if (dist() > REACH_SHOOT + 4)
+    if (type != TD_JUDO && dist() > REACH_SHOOT)
     {
-        msgWho(att, "TROP LOIN !");
-        P[att].act = ACT_STUMBLE; P[att].cooldown = 18;
+        hudMessageWho(att, "TROP LOIN !", 0);
+        P[att].act = ACT_STUMBLE;
+        P[att].cooldown = 40;
+        soloFor(att, SOLO_STUMBLE, FALSE);
+        actorsSoloSet(att, SOLO_STUMBLE, TRUE);
         return;
     }
-    if (P[def].act == ACT_DEFEND)
-    {
-        bool good = (P[att].tdType == TD_JUDO) ? (P[def].defKind == DEF_HIP) : (P[def].defKind == DEF_SPRAWL);
-        if (good)
-        {
-            msgWho(def, (P[def].defKind == DEF_HIP) ? "HANCHE BLOQUEE ! CONTRE" : "SPRAWL ! CONTRE");
-            spend(att, 12);
-            P[att].act = ACT_STUMBLE; P[att].cooldown = 30;
-            sfx(150, 8);
-            crowdReact(FALSE);
-            return;
-        }
-    }
+    seqOk = (type == TD_DOUBLE) ? SEQ_TD_DOUBLE : (type == TD_SINGLE ? SEQ_TD_SINGLE : SEQ_TD_JUDO);
+    seqKo = (type == TD_DOUBLE) ? SEQ_TD_DOUBLE_SPRAWL : (type == TD_SINGLE ? SEQ_TD_SINGLE_SPRAWL : SEQ_TD_JUDO_BLOCK);
 
-    chance = 45 + (STAT(att, ST_LUTTE) - STAT(def, ST_LUTTE)) * 6 + (P[att].souffle - P[def].souffle) / 4;
-    if (P[att].tdType == TD_DOUBLE) chance += 5;
-    if (P[att].tdType == TD_JUDO) chance += P[att].grip / 3 - 5;
-    if (P[def].act == ACT_DEFEND) chance += 15;          /* mauvaise defense : deseiquilibre */
-    if (chance < 10) chance = 10;
-    if (chance > 90) chance = 90;
-
-    if ((s16)(random() % 100) < chance)
+    if (P[def].act == ACT_DEFEND && P[def].defKind == (type == TD_JUDO ? DEF_HIP : DEF_SPRAWL))
     {
-        P[att].points += 2;
-        sfxSlam();
+        hudMessageWho(def, type == TD_JUDO ? "HANCHE BLOQUEE ! CONTRE" : "SPRAWL ! CONTRE", 0);
+        spend(att, 12);
         crowdReact(FALSE);
-        msgWhoPts(att, tdName[P[att].tdType], 2);
-        enterGround(P[att].tdType == TD_JUDO ? POS_SIDE : (P[att].tdType == TD_SINGLE ? POS_HALF : POS_GUARD), att);
+        stageCheer(60);
+        ok = FALSE;
     }
     else
     {
-        msgWho(att, "PROJECTION RATEE");
-        P[att].act = ACT_STUMBLE; P[att].cooldown = 22;
+        chance = 45 + (STAT(att, ST_LUTTE) - STAT(def, ST_LUTTE)) * 6 + (P[att].souffle - P[def].souffle) / 4;
+        if (type == TD_DOUBLE) chance += 5;
+        if (type == TD_JUDO) chance += P[att].grip / 3 - 5;
+        if (P[def].act == ACT_DEFEND) chance += 15;
+        if (chance < 10) chance = 10;
+        if (chance > 90) chance = 90;
+        ok = (s16)(random() % 100) < chance;
+        if (!ok) hudMessageWho(def, "DEFEND LA PROJECTION", 0);
     }
+    setupStandingPair(att, ok ? seqOk : seqKo, type != TD_JUDO);
+    if (ok)
+    {
+        hudMessageWho(att, tdName[type], 2);
+        P[att].points += 2;
+        popAt(att, POP_P2);
+        refSignal(REF_POINTS, P[att].x, 80);
+        nextPos = (type == TD_DOUBLE) ? POS_GUARD : (type == TD_SINGLE ? POS_HALF : POS_SIDE);
+        playSeq(seqOk, att, FALSE, NX_GROUND);
+    }
+    else playSeq(seqKo, att, FALSE, NX_STAND);
 }
 
 static void tryPullGuard(u16 i)
 {
-    if (dist() > REACH_PULL) return;
-    if (P[i].grip < 25) { msgWho(i, "IL FAUT DES PRISES"); P[i].cooldown = 15; return; }
+    if (dist() > REACH_GRIP) return;
+    if (P[i].grip < 25) { hudMessageWho(i, "IL FAUT DES PRISES", 0); P[i].cooldown = 15; return; }
     acted(i);
-    msgWho(i, "TIRE LA GARDE");
-    enterGround(POS_GUARD, OPP(i));
+    hudMessageWho(i, "TIRE LA GARDE", 0);
+    setupStandingPair(i, SEQ_PULL_GUARD, FALSE);
+    nextPos = POS_GUARD;
+    playSeq(SEQ_PULL_GUARD, i, FALSE, NX_GROUND);
 }
 
 /* ---------------- IA debout */
@@ -505,11 +625,11 @@ static void aiStand(u16 i)
     Player* op = &P[OPP(i)];
     s16 d = dist();
     s16 r;
-    u16 dirTowards = (dirTo(i) > 0) ? BUTTON_RIGHT : BUTTON_LEFT;
-    u16 dirAway = (dirTo(i) > 0) ? BUTTON_LEFT : BUTTON_RIGHT;
+    u16 toward = (op->x > me->x) ? BUTTON_RIGHT : BUTTON_LEFT;
+    u16 away = (op->x > me->x) ? BUTTON_LEFT : BUTTON_RIGHT;
 
-    /* reaction a une projection adverse */
-    if (op->act == ACT_SHOOT && op->actTimer == 1)
+    if ((op->act == ACT_SHOOT && op->animFrame == 0 && op->animTick == 1) ||
+        (op->act == ACT_JUDO && op->actTimer == 17))
     {
         u16 chance = 25 + difficulty * 20 + me->def->stat[ST_LUTTE] * 2;
         if ((random() % 100) < chance)
@@ -517,15 +637,11 @@ static void aiStand(u16 i)
             bool read = (random() % 100) < (u16)(55 + difficulty * 15);
             u16 kind = (op->tdType == TD_JUDO) ? DEF_HIP : DEF_SPRAWL;
             if (!read) kind = 1 - kind;
-            me->aiDenyAt = 3 + (random() % 7);
+            me->aiDenyAt = 2 + (random() % 6);
             me->aiDenyBtn = BUTTON_C | (kind == DEF_HIP ? BUTTON_UP : 0);
         }
     }
-    if (me->aiDenyAt > 0)
-    {
-        if (--me->aiDenyAt == 0) me->aiWant = me->aiDenyBtn;
-    }
-
+    if (me->aiDenyAt > 0 && --me->aiDenyAt == 0) me->aiWant = me->aiDenyBtn;
     if (me->aiWant) return;
     if (me->act != ACT_IDLE || me->cooldown > 0) return;
 
@@ -534,72 +650,76 @@ static void aiStand(u16 i)
         me->aiTimer = 18 + (random() % 30) - difficulty * 5;
         r = random() % 100;
         me->aiMoveDir = 0;
-        if (d <= REACH_SHOOT)
+        if (d <= REACH_SHOOT - 6)
         {
-            if (me->grip >= 45 && me->def->stat[ST_LUTTE] >= 6 && r < 30) { me->aiWant = BUTTON_A | BUTTON_UP; return; }
-            if (me->grip >= 25 && me->def->stat[ST_GARDE] >= 7 && r >= 85) { me->aiWant = BUTTON_B | BUTTON_DOWN; return; }
-            if (r < 28 + difficulty * 8) { me->aiWant = BUTTON_A | ((r & 1) ? BUTTON_DOWN : 0); return; }
+            if (me->grip >= 45 && d <= REACH_GRIP && me->def->stat[ST_LUTTE] >= 6 && r < 30) { me->aiWant = BUTTON_A | BUTTON_UP; return; }
+            if (me->grip >= 25 && d <= REACH_GRIP && me->def->stat[ST_GARDE] >= 7 && r >= 85) { me->aiWant = BUTTON_B | BUTTON_DOWN; return; }
+            if (r < 26 + difficulty * 8) { me->aiWant = BUTTON_A | ((r & 1) ? BUTTON_DOWN : 0); return; }
             me->aiMoveDir = (r > 80) ? -1 : 0;
         }
         else me->aiMoveDir = (r < 85) ? 1 : 0;
     }
-
-    if (me->aiMoveDir > 0) me->pad |= dirTowards;
-    else if (me->aiMoveDir < 0) me->pad |= dirAway;
-    /* combat de prises quand on est a distance */
+    if (me->aiMoveDir > 0) me->pad |= toward;
+    else if (me->aiMoveDir < 0) me->pad |= away;
     if (d <= REACH_GRIP && (frameCount & 63) < (u16)(30 + difficulty * 10)) me->pad |= BUTTON_B;
 }
 
-/* ---------------- un combattant debout */
 static bool standAction(u16 i)
 {
     Player* f = &P[i];
-
     if (f->act == ACT_SHOOT)
     {
-        f->actTimer++;
-        if (f->actTimer >= 12 && f->actTimer < 18) moveFighter(i, dirTo(i) * 2, 14);
-        if (f->actTimer == 18)
+        if (actorsSoloDone(i))
         {
+            f->act = ACT_IDLE;
             resolveShoot(i);
-            if (phase != PH_STAND) return TRUE;
-            if (f->act == ACT_SHOOT) { f->act = ACT_IDLE; f->cooldown = 16; }
+        }
+        return TRUE;
+    }
+    if (f->act == ACT_JUDO)
+    {
+        if (--f->actTimer <= 0)
+        {
+            f->act = ACT_IDLE;
+            resolveShoot(i);
         }
         return TRUE;
     }
     if (f->act == ACT_DEFEND)
     {
-        if (++f->actTimer >= 22) { f->act = ACT_IDLE; f->cooldown = 18; }
+        if (--f->defTimer <= 0) { f->act = ACT_IDLE; f->cooldown = 16; soloFor(i, SOLO_IDLE, FALSE); }
         return TRUE;
     }
     if (f->act == ACT_STUMBLE)
     {
-        if (--f->cooldown <= 0) { f->act = ACT_IDLE; f->cooldown = 0; }
+        if (actorsSoloDone(i)) { f->act = ACT_IDLE; soloFor(i, SOLO_IDLE, FALSE); }
         return TRUE;
     }
-    if (f->cooldown > 0) { f->cooldown--; return TRUE; }
+    if (f->cooldown > 0) { f->cooldown--; }
     return FALSE;
 }
 
 static void standInput(u16 i)
 {
     Player* f = &P[i];
-    bool gripping = FALSE;
+    bool moving = FALSE, gripping = FALSE;
     s16 sp = (f->souffle < 25 && (frameCount & 1)) ? 0 : 1;
 
-    if (pressed(i, BUTTON_A))
+    if (f->cooldown <= 0)
     {
-        u16 t = TD_DOUBLE;
-        if (held(i, BUTTON_UP)) t = TD_JUDO;
-        else if (held(i, BUTTON_DOWN)) t = TD_SINGLE;
-        startShoot(i, t);
-        return;
+        if (pressed(i, BUTTON_A))
+        {
+            u16 t = TD_DOUBLE;
+            if (held(i, BUTTON_UP)) t = TD_JUDO;
+            else if (held(i, BUTTON_DOWN)) t = TD_SINGLE;
+            startShoot(i, t);
+            return;
+        }
+        if (pressed(i, BUTTON_B) && held(i, BUTTON_DOWN)) { tryPullGuard(i); if (phase != PH_STAND) return; }
+        if (pressed(i, BUTTON_C)) { startDefend(i, held(i, BUTTON_UP) ? DEF_HIP : DEF_SPRAWL); return; }
     }
-    if (pressed(i, BUTTON_B) && held(i, BUTTON_DOWN)) { tryPullGuard(i); return; }
-    if (pressed(i, BUTTON_C)) { startDefend(i, held(i, BUTTON_UP) ? DEF_HIP : DEF_SPRAWL); return; }
-
-    if (held(i, BUTTON_LEFT))  moveFighter(i, -sp, MIN_GAP);
-    if (held(i, BUTTON_RIGHT)) moveFighter(i, sp, MIN_GAP);
+    if (held(i, BUTTON_LEFT))  { moveFighter(i, -sp); moving = TRUE; }
+    if (held(i, BUTTON_RIGHT)) { moveFighter(i, sp); moving = TRUE; }
 
     if (held(i, BUTTON_B) && !held(i, BUTTON_DOWN) && dist() <= REACH_GRIP)
     {
@@ -607,101 +727,41 @@ static void standInput(u16 i)
         if (f->grip < 100) { f->grip += 2; if (f->grip > 100) f->grip = 100; }
         if (P[OPP(i)].grip > 0) P[OPP(i)].grip--;
         if ((frameCount % 20) == 0) spend(i, 1);
-        if ((frameCount & 15) == 0) hudDirty = TRUE;
+        /* en tenant, on se rapproche a distance de prise */
+        if (dist() > GAP_GRIP + 2) moveFighter(i, f->dir);
     }
     if (!gripping && f->grip > 0 && (frameCount & 1)) f->grip--;
-    if (dist() > REACH_GRIP + 12) f->grip = 0;
+    if (dist() > REACH_GRIP + 14) f->grip = 0;
+
+    if (gripping) soloFor(i, SOLO_GRIP_HOLD, FALSE);
+    else if (moving)
+    {
+        bool fwd = (held(i, BUTTON_RIGHT) && f->dir > 0) || (held(i, BUTTON_LEFT) && f->dir < 0);
+        soloFor(i, SOLO_WALK, !fwd);
+    }
+    else soloFor(i, f->souffle < 30 ? SOLO_TIRED : SOLO_IDLE, FALSE);
 }
 
 static void updateStand(void)
 {
     u16 i;
-
-    P[0].walking = P[1].walking = FALSE;
-    for (i = 0; i < 2; i++)
-    {
-        if (!P[i].human) aiStand(i);
-    }
+    for (i = 0; i < 2; i++) if (!P[i].human) aiStand(i);
     for (i = 0; i < 2 && phase == PH_STAND; i++)
-    {
         if (!standAction(i)) standInput(i);
-    }
     if (phase != PH_STAND) return;
-
+    P[0].dir = (P[0].x < P[1].x) ? 1 : -1;
+    P[1].dir = -P[0].dir;
     for (i = 0; i < 2; i++)
     {
         if (P[i].act == ACT_IDLE) regen(i, 6);
         stallCheck(i);
-        updateFighterSprite(i, STAND_Y);
     }
+    actorsSoloUpdate();
+    stageSetCamera((P[0].x + P[1].x) / 2);
+    refFollow((P[0].x + P[1].x) / 2);
 }
 
 /* ==================================================================== SOL */
-static const Move* moveFor(u16 who, u16 dir)
-{
-    const Move* m = (who == top) ? &topMoves[pos][dir] : &botMoves[pos][dir];
-    return m->name ? m : NULL;
-}
-
-static const SubMove* subFor(u16 who, u16 dir)
-{
-    const SubMove* s = (who == top) ? &topSubs[pos][dir] : &botSubs[pos][dir];
-    return s->name ? s : NULL;
-}
-
-static void groundInfo(void)
-{
-    char b[41];
-    u16 n = 0, d;
-    const char* p = P[top].label;
-
-    while (*p && n < 16) b[n++] = *p++;
-    p = " DESSUS - ";
-    while (*p) b[n++] = *p++;
-    p = posName[pos];
-    while (*p && n < 40) b[n++] = *p++;
-    b[n] = 0;
-    txtCenter(b, ROW_INFO, TXT_DARK);
-    clearRow(ROW_GAUGE);
-
-    clearRows(ROW_HINT, ROW_HINT + 2);
-    if (!P[0].human || numHumans == 2) return;
-    for (d = 0; d < 3; d++)
-    {
-        const Move* m = moveFor(0, d);
-        const SubMove* s = subFor(0, d);
-        char a[2] = { dirChar[d], 0 };
-        if (!m && !s) continue;
-        txt(a, 0, ROW_HINT + d, TXT_RED);
-        if (m) { txt("A", 2, ROW_HINT + d, TXT_RED); txt(m->name, 4, ROW_HINT + d, TXT_DARK); }
-        if (s) { txt("B", 22, ROW_HINT + d, TXT_RED); txt(s->name, 24, ROW_HINT + d, TXT_DARK); }
-    }
-}
-
-static void enterGround(u16 p, u16 newTop)
-{
-    u16 i;
-    phase = PH_GROUND;
-    pos = p;
-    top = newTop;
-    pend = FALSE;
-    for (i = 0; i < 2; i++)
-    {
-        P[i].cooldown = 30;
-        P[i].act = ACT_IDLE;
-        P[i].grip = 0;
-        P[i].aiWant = 0;
-        P[i].aiDenyAt = 0;
-        P[i].aiTimer = 40 + (random() % 40);
-    }
-    setGroundPalette(top);
-    SPR_setAnimAndFrame(groundSpr, pos, 0);
-    SPR_setPosition(groundSpr, GROUND_SPR_X, GROUND_SPR_Y);
-    showStanding(FALSE);
-    groundInfo();
-    hudDirty = TRUE;
-}
-
 static void startPend(u16 who, u16 kind, u16 dir)
 {
     s16 st = (kind == PEND_SUB) ? STAT(who, ST_SOUM) : (who == top ? STAT(who, ST_PASSAGE) : STAT(who, ST_GARDE));
@@ -713,10 +773,8 @@ static void startPend(u16 who, u16 kind, u16 dir)
     pendDenyUsed = FALSE;
     spend(who, (kind == PEND_SUB) ? 8 : 6);
     acted(who);
-    txtCenter((who == 0) ? "<<<  ATTAQUE !" : "ATTAQUE !  >>>", ROW_GAUGE, TXT_RED);
+    popAt(who, POP_DANGER);
     sfx(kind == PEND_SUB ? 700 : 440, 6);
-
-    /* IA en defense : va-t-elle lire l'attaque ? */
     {
         u16 d = OPP(who);
         if (!P[d].human)
@@ -740,32 +798,24 @@ static void applyMove(u16 who, const Move* m)
 {
     if (m->target == STANDUP)
     {
-        msgWho(who, m->name);
-        enterStand(160);
+        hudMessageWho(who, m->name, 0);
+        playSeq(m->seq, top, FALSE, NX_STAND);
         return;
     }
-    if (m->swap) top = who;
-    pos = m->target;
-    P[who].points += m->points;
-    P[who].adv += m->adv;
-    if (m->adv && !m->points) msgWho(who, "AVANTAGE ! GARDE OUVERTE");
-    else msgWhoPts(who, m->name, m->points);
-    if (m->points || m->swap) { sfxSlam(); crowdReact(FALSE); }
-    else sfx(520, 6);
-    setGroundPalette(top);
-    SPR_setAnimAndFrame(groundSpr, pos, 0);
-    groundInfo();
-    hudDirty = TRUE;
+    nextPos = m->target;
+    if (m->points) hudMessageWho(who, m->name, m->points);
+    else if (m->adv) hudMessageWho(who, "AVANTAGE ! GARDE OUVERTE", 0);
+    else hudMessageWho(who, m->name, 0);
+    award(who, m->points, m->adv);
+    playSeq(m->seq, top, FALSE, NX_GROUND);
 }
 
 static void resolvePend(void)
 {
     u16 who = pendWho, d = OPP(who);
     pend = FALSE;
-    P[who].cooldown = 40;
-    P[d].cooldown = 12;
-    clearRow(ROW_GAUGE);
-
+    groundCd[who] = 40;
+    groundCd[d] = 12;
     if (pendKind == PEND_SUB)
     {
         startSub(who, subFor(who, pendDir));
@@ -778,28 +828,26 @@ static void resolvePend(void)
         s16 chance = 58 + (sa - sd) * 5 + (P[who].souffle - P[d].souffle) / 4 - m->diff * 6;
         if (chance < 15) chance = 15;
         if (chance > 95) chance = 95;
-        STATINC(statMove[who]);
-        if ((s16)(random() % 100) < chance) { STATINC(statMoveOk[who]); applyMove(who, m); }
-        else { msgWho(d, "RESISTE"); sfx(160, 6); }
+        if ((s16)(random() % 100) < chance) applyMove(who, m);
+        else { hudMessageWho(d, "RESISTE", 0); sfx(160, 6); actorsShake(10); }
     }
 }
 
 static void denied(u16 d)
 {
     u16 who = pendWho;
-    STATINC(statDeny[d]);
     pend = FALSE;
     spend(who, 12);
-    P[who].cooldown = 30;
-    P[d].cooldown = 6;
+    groundCd[who] = 30;
+    groundCd[d] = 6;
     P[d].idle = 0;
-    clearRow(ROW_GAUGE);
-    msgWho(d, "BLOQUE ! BONNE LECTURE");
+    hudMessageWho(d, "BLOQUE ! BONNE LECTURE", 0);
     sfx(180, 10);
+    actorsShake(14);
     crowdReact(FALSE);
+    stageCheer(50);
 }
 
-/* ---------------- IA au sol */
 static void aiGround(u16 i)
 {
     Player* me = &P[i];
@@ -811,10 +859,9 @@ static void aiGround(u16 i)
         if (!pend || pendWho == i) me->aiDenyAt = 0;
         else if (--me->aiDenyAt == 0) me->aiWant = me->aiDenyBtn;
     }
-    if (pend || me->cooldown > 0 || me->aiWant) return;
+    if (pend || groundCd[i] > 0 || me->aiWant) return;
     if (--me->aiTimer > 0) return;
     me->aiTimer = 110 - difficulty * 25 + (random() % 60);
-
     for (d = 0; d < 3; d++)
     {
         const Move* m = moveFor(i, d);
@@ -823,7 +870,7 @@ static void aiGround(u16 i)
         {
             sc = m->points * 10 + m->adv * 6 + 20 - m->diff * 6 + (random() % 30);
             if (m->target == STANDUP) sc -= 25;
-            if (i != top && m->target != STANDUP) sc += 15;      /* dessous : sortir d'abord */
+            if (i != top && m->target != STANDUP) sc += 15;
             if (sc > best) { best = sc; bestKind = PEND_MOVE; bestDir = d; }
         }
         if (s)
@@ -842,13 +889,10 @@ static void aiGround(u16 i)
 static void updateGround(void)
 {
     u16 i;
-
     for (i = 0; i < 2; i++) if (!P[i].human) aiGround(i);
-
     if (pend)
     {
         u16 d = OPP(pendWho);
-        SPR_setFrame(groundSpr, (frameCount / 3) & 1);
         if (!pendDenyUsed && pressed(d, BUTTON_C))
         {
             pendDenyUsed = TRUE;
@@ -857,24 +901,12 @@ static void updateGround(void)
         if (--pendTimer <= 0) resolvePend();
         return;
     }
-
-    SPR_setFrame(groundSpr, 0);
     for (i = 0; i < 2; i++)
     {
-        if (P[i].cooldown > 0) { P[i].cooldown--; continue; }
-        if (pressed(i, BUTTON_A))
-        {
-            u16 d = dirOf(i);
-            if (moveFor(i, d)) { startPend(i, PEND_MOVE, d); return; }
-        }
-        if (pressed(i, BUTTON_B))
-        {
-            u16 d = dirOf(i);
-            if (subFor(i, d)) { startPend(i, PEND_SUB, d); return; }
-        }
+        if (groundCd[i] > 0) { groundCd[i]--; continue; }
+        if (pressed(i, BUTTON_A) && moveFor(i, dirOf(i))) { startPend(i, PEND_MOVE, dirOf(i)); return; }
+        if (pressed(i, BUTTON_B) && subFor(i, dirOf(i))) { startPend(i, PEND_SUB, dirOf(i)); return; }
     }
-
-    /* recuperation : sous la pression, celui du dessous respire mal */
     regen(top, 5);
     regen(OPP(top), (pos >= POS_SIDE) ? 14 : 7);
     stallCheck(0);
@@ -892,94 +924,24 @@ static void subLayout(void)
 static void startSub(u16 who, const SubMove* s)
 {
     u16 d = OPP(who);
-    phase = PH_SUB;
     subWho = who;
-    subFam = s->family;
-    subDiff = s->diff;
-    subNameStr = s->name;
+    subM = s;
     gate = 0;
     tug = 0;
-    STATINC(statSubStart[who]);
-
-    lenA = 3 + STAT(who, ST_SOUM) / 3 + (P[who].def->special == subFam ? 1 : 0) - subDiff - (P[who].souffle < 30 ? 1 : 0);
+    lenA = 3 + STAT(who, ST_SOUM) / 3 + (P[who].def->special == s->family ? 1 : 0) - s->diff - (P[who].souffle < 30 ? 1 : 0);
     if (lenA < 3) lenA = 3;
     if (lenA > 8) lenA = 8;
     lenD = 3 + (STAT(d, ST_SOUM) + STAT(d, ST_CARDIO)) / 6 - (P[d].souffle < 30 ? 1 : 0);
     if (lenD < 2) lenD = 2;
     subLayout();
     P[0].aiTimer = P[1].aiTimer = 0;
-
-    clearRows(ROW_INFO, ROW_HINT + 2);
-    msgWho(who, s->name);
+    hudClearHints();
+    clearRow(7);
+    hudMessageWho(who, s->name, 0);
     sfx(880, 10);
     crowdReact(FALSE);
-}
-
-static void drawSub(void)
-{
-    char b[41];
-    u16 k, n = 0;
-    s16 a0 = P[subWho].cur / 16, d0 = P[OPP(subWho)].cur / 16;
-    const char* p = subNameStr;
-
-    while (*p) b[n++] = *p++;
-    p = "  PORTE ";
-    while (*p) b[n++] = *p++;
-    b[n++] = '1' + gate; b[n++] = '/'; b[n++] = '3'; b[n] = 0;
-    txtCenter(b, ROW_INFO, TXT_DARK);
-
-    /* barre : '=' attaquant (rouge), '#' defenseur (vert), 'X' quand ils se couvrent.
-       4 ecritures maximum : fond, defenseur (2 morceaux autour de l'attaquant), attaquant */
-    {
-        char base[BAR_CELLS + 3], seg[BAR_CELLS + 1];
-        s16 a1 = a0 + lenA, d1 = d0 + lenD, x;
-        for (k = 0; k < BAR_CELLS; k++) base[1 + k] = '-';
-        base[0] = '['; base[BAR_CELLS + 1] = ']'; base[BAR_CELLS + 2] = 0;
-        txt(base, 5, ROW_GAUGE, TXT_DARK);
-
-        /* defenseur, a gauche de l'attaquant */
-        n = 0;
-        for (x = d0; x < d1 && x < a0; x++) seg[n++] = '#';
-        seg[n] = 0;
-        if (n) txt(seg, 6 + d0, ROW_GAUGE, TXT_GREEN);
-        /* defenseur, a droite de l'attaquant */
-        n = 0;
-        for (x = (d0 > a1 ? d0 : a1); x < d1; x++) seg[n++] = '#';
-        seg[n] = 0;
-        if (n) txt(seg, 6 + (d0 > a1 ? d0 : a1), ROW_GAUGE, TXT_GREEN);
-        /* attaquant, 'X' sur le defenseur */
-        n = 0;
-        for (x = a0; x < a1; x++) seg[n++] = (x >= d0 && x < d1) ? 'X' : '=';
-        seg[n] = 0;
-        txt(seg, 6 + a0, ROW_GAUGE, TXT_RED);
-    }
-
-    /* jauge de la porte */
-    {
-        s16 idx = (tug + 100) * 20 / 200;
-        if (idx < 0) idx = 0;
-        if (idx > 20) idx = 20;
-        n = 0;
-        p = "ECHAPPE [";
-        while (*p) b[n++] = *p++;
-        for (k = 0; k < 21; k++) b[n++] = ((s16)k == idx) ? 'O' : (k == 10 ? '|' : '-');
-        p = "] TAPE";
-        while (*p) b[n++] = *p++;
-        b[n] = 0;
-        txtCenter(b, ROW_MSG, TXT_DARK);
-    }
-}
-
-static void subHints(void)
-{
-    clearRows(ROW_HINT, ROW_HINT + 2);
-    if (numHumans == 0) return;
-    txt("= ", 3, ROW_HINT, TXT_RED);
-    txt(P[subWho].label, 5, ROW_HINT, TXT_DARK);
-    txt(": COUVRE L'AUTRE CURSEUR", 5 + slen(P[subWho].label), ROW_HINT, TXT_DARK);
-    txt("# ", 3, ROW_HINT + 1, TXT_GREEN);
-    txt(P[OPP(subWho)].label, 5, ROW_HINT + 1, TXT_DARK);
-    txt(": ECHAPPE-LUI (CROIX)", 5 + slen(P[OPP(subWho)].label), ROW_HINT + 1, TXT_DARK);
+    stageCheer(100);
+    playSeq(s->seq, top, FALSE, NX_SUB);
 }
 
 static void aiSub(u16 i)
@@ -987,20 +949,18 @@ static void aiSub(u16 i)
     Player* me = &P[i];
     s16 len = (i == subWho) ? lenA : lenD;
     s16 maxPos = (BAR_CELLS - len) * 16;
-
     if (--me->aiTimer <= 0)
     {
         me->aiTimer = ((i == subWho) ? cpuReact[difficulty] : cpuEscape[difficulty]) + (random() % 5);
         if (i == subWho)
         {
-            s16 dc = P[OPP(i)].cur + lenD * 8;               /* centre du defenseur */
+            s16 dc = P[OPP(i)].cur + lenD * 8;
             s16 noise = 49 - difficulty * 8;
             me->aiTarget = dc - lenA * 8 + ((s16)(random() % noise) - noise / 2);
         }
         else
         {
-            s16 ac = P[OPP(i)].cur + lenA * 8;               /* centre de l'attaquant */
-            /* fuir vers le cote qui a le plus de place */
+            s16 ac = P[OPP(i)].cur + lenA * 8;
             me->aiTarget = (ac > BAR_CELLS * 8) ? 0 : maxPos;
             if ((random() % 100) < 20) me->aiTarget = maxPos - me->aiTarget;
         }
@@ -1015,7 +975,6 @@ static void updateSub(void)
 {
     u16 i, d = OPP(subWho);
     s16 a0, a1, d0, d1, ov;
-
     for (i = 0; i < 2; i++)
     {
         s16 len = (i == subWho) ? lenA : lenD;
@@ -1030,34 +989,33 @@ static void updateSub(void)
         if (P[i].cur > maxPos) P[i].cur = maxPos;
         if ((frameCount % 10) == 0) spend(i, 1);
     }
-
     a0 = P[subWho].cur; a1 = a0 + lenA * 16;
     d0 = P[d].cur;      d1 = d0 + lenD * 16;
     ov = ((a1 < d1) ? a1 : d1) - ((a0 > d0) ? a0 : d0);
-    /* il faut couvrir au moins la moitie du curseur adverse */
-    if (ov * 2 >= lenD * 16) tug += (P[subWho].def->special == subFam) ? 3 : 2;
+    if (ov * 2 >= lenD * 16) tug += (P[subWho].def->special == subM->family) ? 3 : 2;
     else tug -= 2;
-
-    SPR_setFrame(groundSpr, (frameCount / 4) & 1);
-    if ((frameCount % 3) == 0) drawSub();
+    if ((frameCount & 1) == 0)
+        hudSubGauge(subM->name, gate, P[subWho].cur / 16, lenA, P[d].cur / 16, lenD, tug, BAR_CELLS);
 
     if (tug >= 100)
     {
         gate++;
         sfx(1000 + gate * 200, 8);
         crowdReact(FALSE);
+        stageCheer(80);
         if (gate >= 3)
         {
             char b[32];
-            u16 n = 0;
-            const char* p = "SOUMISSION : ";
-            while (*p) b[n++] = *p++;
-            p = subNameStr;
-            while (*p && n < 31) b[n++] = *p++;
-            b[n] = 0;
-            SPR_setFrame(groundSpr, 0);
-            STATINC(statSubWin[subWho]);
-            endMatch(subWho, b);
+            b[0] = 0;
+            scat(b, "SOUMISSION : ", 31);
+            scat(b, subM->name, 31);
+            hudSubClear();
+            phase = PH_TAP;
+            phaseTimer = 110;
+            actorsPairStart(subM->seq + 2, anchor, flip, top, FALSE);
+            resWinner = subWho;
+            scopy(resMethod, b, 31);
+            fxBanner(BAN_FINALIZOU, 110);
             return;
         }
         tug = 0;
@@ -1065,15 +1023,14 @@ static void updateSub(void)
     }
     else if (tug <= -100)
     {
-        if (gate >= 1) { P[subWho].adv++; msgWho(d, "S'ECHAPPE ! (AVANTAGE)"); }
-        else msgWho(d, "S'ECHAPPE !");
+        if (gate >= 1) { P[subWho].adv++; hudMessageWho(d, "S'ECHAPPE ! (AVANTAGE)", 0); popAt(subWho, POP_AV); }
+        else hudMessageWho(d, "S'ECHAPPE !", 0);
         spend(subWho, 20);
         sfx(160, 10);
-        phase = PH_GROUND;
-        P[subWho].cooldown = 120;            /* rater une soumission, ca se paie */
-        P[d].cooldown = 10;
-        groundInfo();
-        hudDirty = TRUE;
+        hudSubClear();
+        groundCd[subWho] = 120;
+        groundCd[d] = 10;
+        playSeq(subM->seq, top, TRUE, NX_ESCAPE);
     }
 }
 
@@ -1081,41 +1038,68 @@ static void updateSub(void)
 void match_enter(void)
 {
     u16 i;
-
     gameMode = MODE_MATCH;
-    showBackground(&bg_dojo);
-    applyPlayerPalettes();
+    VDP_clearPlane(BG_A, TRUE);
+    stageLoad(stageIdx);
+    applyFighterPalettes();
+    actorsInit();
+    fxInit();
     for (i = 0; i < 2; i++)
     {
-        P[i].souffle = 100;
-        P[i].cardio = 100;
+        P[i].souffle = P[i].cardio = 100;
         P[i].points = P[i].adv = P[i].pen = 0;
         P[i].attempts = 0;
         P[i].idle = 0;
         P[i].aiDenyAt = 0;
         P[i].aiMoveDir = 0;
-        P[i].pad = P[i].prev = 0xFFFF;          /* evite un appui fantome au demarrage */
+        P[i].act = ACT_IDLE;
+        P[i].grip = 0;
+        P[i].pad = P[i].prev = 0xFFFF;
+        P[i].animRev = FALSE;
     }
-    matchFrames = (numHumans == 0) ? 60L * 60 : (s32)matchMinutes * 60 * 60;
-    msgTimer = 0;
+    P[0].x = WORLD_W / 2 - START_GAP / 2;
+    P[1].x = WORLD_W / 2 + START_GAP / 2;
+    P[0].dir = 1;
+    P[1].dir = -1;
+    matchFrames = (gameType == GAME_DEMO) ? 60L * 60 : (s32)matchMinutes * 60 * 60;
+    resWinner = -1;
+    resBySub = FALSE;
+    hudInit();
+    hudDraw(matchFrames, TRUE);
     crowdStart();
-    enterStand(160);
-    drawHud();
-    message("COMBATE !");
-    playTune(tuneStart, 3);
-    if (numHumans == 0) txtCenter("DEMO - APPUIE SUR START", 23, TXT_WHITE);
+    refInit(WORLD_W / 2 + 90);
+    /* salut d'avant combat */
+    top = 1;
+    flip = FALSE;
+    anchor = WORLD_W / 2;
+    actorsPairStart(SEQ_SHAKE, anchor, flip, 1, FALSE);
+    phase = PH_ANIM;
+    next = NX_FIGHT;
+    fxBanner(BAN_OSS, 80);
+    stageCheer(120);
+    if (gameType == GAME_DEMO) wtxtC("DEMO - APPUIE SUR START", 22);
+    actorsDraw();
+    SPR_update();
+    fadeInScreen(16);
+}
+
+void matchLeave(void)
+{
+    fxRelease();
+    actorsRelease();
+    crowdStop();
+    VDP_setScrollingMode(HSCROLL_PLANE, VSCROLL_PLANE);
+    VDP_setHorizontalScroll(BG_B, 0);
 }
 
 void match_update(void)
 {
     u16 i;
-
-    /* les IA "appuient" sur leurs boutons (une pression = un front montant) */
     for (i = 0; i < 2; i++)
     {
         if (!P[i].human && P[i].aiWant)
         {
-            if (P[i].prev & P[i].aiWant & BTN_ACTS) continue;   /* relacher d'abord */
+            if (P[i].prev & P[i].aiWant & BTN_ACTS) continue;
             P[i].pad |= P[i].aiWant;
             P[i].aiWant = 0;
         }
@@ -1123,22 +1107,53 @@ void match_update(void)
 
     switch (phase)
     {
-        case PH_STAND:  updateStand();  break;
-        case PH_GROUND: updateGround(); break;
+        case PH_STAND:
+            updateStand();
+            break;
+        case PH_ANIM:
+            if (actorsPairUpdate()) seqDone();
+            stageSetCamera(anchor);
+            break;
+        case PH_GROUND:
+            actorsPairUpdate();
+            updateGround();
+            stageSetCamera(anchor);
+            break;
         case PH_SUB:
+            actorsPairUpdate();
             updateSub();
-            if (phase == PH_SUB && (frameCount % 30) == 0) subHints();
+            break;
+        case PH_TAP:
+            actorsPairUpdate();
+            if ((phaseTimer & 15) == 0) sfxNoise(4);
+            if (--phaseTimer <= 0)
+            {
+                phase = PH_ANIM;     /* evite le double appel */
+                endMatch(resWinner, resMethod, TRUE, BAN_FINALIZOU);
+            }
+            break;
+        case PH_DECIDE:
+            actorsPairUpdate();
+            actorsSoloUpdate();
+            if (--phaseTimer <= 0) startOutro();
             break;
         case PH_OVER:
-            if (--overTimer <= 0) { result_enter(); return; }
+            actorsSoloUpdate();
+            if (--phaseTimer <= 0) { matchLeave(); result_enter(); return; }
             break;
     }
 
-    if (phase != PH_OVER)
+    if (phase == PH_STAND || phase == PH_GROUND || phase == PH_SUB || phase == PH_ANIM)
     {
-        if (--matchFrames <= 0) { matchFrames = 0; timeUp(); }
+        if (phase != PH_ANIM || next != NX_FIGHT)
+        {
+            if (--matchFrames <= 0) { matchFrames = 0; timeUp(); }
+        }
     }
-    if (hudDirty || (frameCount & 15) == 0) drawHud();
-    if (msgTimer > 0 && --msgTimer == 0 && phase != PH_SUB) clearRow(ROW_MSG);
+    hudDraw(matchFrames, FALSE);
+    hudUpdate();
     crowdUpdate(pend || phase == PH_SUB);
+    stageUpdate();
+    fxUpdate();
+    actorsDraw();
 }
