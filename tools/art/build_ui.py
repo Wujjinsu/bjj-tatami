@@ -521,8 +521,8 @@ def build_shadow_pair():
 
 
 # ---------------------------------------------------------------- arbitre
-REF_MAP = {0: 0, 1: K, 2: SK, 3: SK, 4: SKS, 5: K, 6: K, 7: DG, 8: K, 9: K, 10: K, 11: K, 12: SKS,
-           13: RD, 14: WH, 15: WH, 17: LG, 18: LG, 19: DG, 20: DG, 21: DG}
+REF_MAP = {0: 0, 1: K, 2: SK, 3: SK, 4: SKS, 5: RD, 6: DR, 7: NV, 8: NV, 9: K, 10: K, 11: K, 12: NV,
+           13: RD, 14: WH, 15: WH, 17: NV, 18: K, 19: K, 20: K, 21: DG}
 RW, RH, RX = 96, 112, 48
 
 
@@ -532,8 +532,9 @@ def ref_pose(kind, k=0):
     fr = Frame(p)
     S = fr.S
     if kind == "idle":
-        p = ik_arm(p, "N", (fr.P[0] + 6, fr.P[1] + 6 + k), 1)
-        p = ik_arm(p, "F", (fr.P[0] - 4, fr.P[1] + 7 + k), 1)
+        # mains jointes devant le ventre, comme un arbitre qui attend
+        p = ik_arm(p, "N", (fr.P[0] + 6, fr.P[1] + 7 + k), 1)
+        p = ik_arm(p, "F", (fr.P[0] + 5, fr.P[1] + 8 + k), 1)
     elif kind == "walk":
         p = stand(X, h=36.5, lean=6, step_n=[10, 3, -6, 3][k], step_f=[-8, 1, 9, 1][k])
         fr = Frame(p)

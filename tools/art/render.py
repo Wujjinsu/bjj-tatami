@@ -31,7 +31,16 @@ BAYER = np.array([[0, 2], [3, 1]]) / 4.0 - 0.375
 
 class Costume:
     def __init__(self, sleeve=1.0, pants=1.0, belt=True, skirt=True, patch=True, hair=True,
-                 cuffs=True, collar=True):
+                 cuffs=True, collar=True, tie=False, glasses=False, band=False, pocket=False,
+                 shoes=False, goatee=False, brow=True, shine=False):
+        self.tie = tie            # chemise blanche + cravate rouge
+        self.glasses = glasses    # lunettes a monture noire
+        self.band = band          # poignets rouges
+        self.pocket = pocket      # ecusson blanc sur la poche
+        self.shoes = shoes        # chaussures noires (au lieu de pieds nus)
+        self.goatee = goatee      # moustache + bouc
+        self.brow = brow
+        self.shine = shine        # crane rase brillant
         self.sleeve = sleeve      # fraction de l'avant-bras couverte (0 = manches courtes)
         self.pants = pants
         self.belt = belt
@@ -43,7 +52,9 @@ class Costume:
 
 
 GI_COSTUME = Costume()
-REF_COSTUME = Costume(sleeve=-0.55, belt=False, skirt=False, patch=False, collar=False, cuffs=False)
+REF_COSTUME = Costume(sleeve=1.0, belt=False, skirt=False, patch=False, collar=False, cuffs=False,
+                      hair=False, tie=True, glasses=True, band=True, pocket=True, shoes=True,
+                      goatee=True, brow=False, shine=True)
 
 
 # ---------------------------------------------------------------- primitives
@@ -223,6 +234,10 @@ def _arm(L, fr, side, cos, darken):
         cuff = v_add(E, v_mul(v_sub(W, E), sl))
         sleeve = Union([Cap(v_add(S, v_mul(v_norm(v_sub(E, S)), 1.5)), E, 5.6, 4.4), Cap(E, cuff, 4.4, 3.9)])
         L.draw(sleeve, GI, darken=darken)
+        if cos.band:       # revers de manche rouge au poignet
+            dvb = v_norm(v_sub(W, E))
+            L.draw(Cap(v_add(W, v_mul(dvb, -3.4)), v_add(W, v_mul(dvb, 0.4)), 4.0, 3.7),
+                   (RED, RED, HAIR_DK), thresholds=[0.55, 0.15], darken=darken, edge=False)
         # avant-bras nu + poignet
         if sl < 1:
             L.draw(Cap(cuff, W, 2.6, 2.2), SKIN, darken=darken)
@@ -306,11 +321,16 @@ def _leg(L, fr, side, cos, darken):
         b = v_add(b, v_mul(fw, 1.5))
         L.draw(Cap(a, b, 1.4, 1.4), (ACC,), edge=False, dither=False, cover=0.45)
     # cheville + pied
-    L.draw(Cap(hem, A, 2.6, 2.4), SKIN, darken=darken)
     fd = v_norm(v_sub(T, A))
     dn = v_mul(v_norm(v_sub(A, K)), 1.0)
     heel = v_add(v_add(A, v_mul(fd, -1.6)), v_mul(dn, 1.2))
     toe = v_add(T, v_mul(dn, 1.0))
+    if cos.shoes:      # chaussettes + chaussures noires vernies
+        L.draw(Cap(hem, A, 2.9, 2.7), (PANTS[1], PANTS[2], PANTS[3]), darken=darken)
+        L.draw(Union([Cap(heel, v_add(toe, v_mul(fd, 0.6)), 2.8, 2.2)]), (BELT_HI, PANTS[2], PANTS[3]),
+               thresholds=[0.72, 0.25], darken=darken)
+        return
+    L.draw(Cap(hem, A, 2.6, 2.4), SKIN, darken=darken)
     L.draw(Union([Cap(heel, toe, 2.4, 1.8)]), SKIN, darken=darken)
 
 
@@ -359,9 +379,30 @@ def _torso(L, fr, cos, darken=0.0):
         b0 = v_add(v_add(P, v_mul(up, 7.0)), v_mul(fw, -7.0))
         L.line(b0, v_add(b0, v_add(v_mul(fw, 3.5), v_mul(up, 1.5))), GI[3], only_on=GI_SET)
     else:
-        # col de polo
+        # col de polo / de chemise
         L.draw(Cap(v_add(N, v_mul(fw, -4.0)), v_add(N, v_mul(fw, 3.5)), 1.8, 1.8), (EYE, EYE, EYE),
                edge=False, dither=False)
+    if cos.tie:
+        top = v_add(v_add(N, v_mul(fw, 3.4)), v_mul(up, -1.0))
+        bot = v_add(v_add(P, v_mul(up, 6.5)), v_mul(fw, 8.0))
+        mid = v_add(top, v_mul(v_sub(bot, top), 0.22))
+        # plastron de chemise blanche (V du veston)
+        L.draw(Cap(top, bot, 3.3, 1.4), (EYE, EYE, EYE), edge=False, dither=False, cover=0.4)
+        # cravate rouge : noeud + lame qui s'evase
+        L.draw(Cap(v_add(top, v_mul(fw, 0.4)), mid, 1.9, 1.7), (RED, RED, HAIR_DK), thresholds=[0.4, 0.0],
+               edge=False, dither=False, cover=0.4)
+        L.draw(Cap(mid, bot, 1.5, 2.4), (RED, RED, HAIR_DK), thresholds=[0.45, 0.05], edge=False,
+               dither=False, cover=0.4)
+        L.line(top, v_add(top, v_mul(fw, 0.0)), HAIR_DK)
+    if cos.pocket:
+        # ecusson blanc sur la poche de poitrine
+        c = v_add(v_add(P, v_mul(up, 13.5)), v_mul(fw, 5.0))
+        for dx in range(-2, 2):
+            for dy in range(-1, 2):
+                L.pixel(v_add(c, (dx, dy)), OUT, only_on=set(GI))
+        for dx in range(-1, 1):
+            for dy in range(0, 1):
+                L.pixel(v_add(c, (dx, dy)), EYE, only_on=set(GI) | {OUT})
 
 
 def _head(L, fr, cos, beard=False):
@@ -389,7 +430,20 @@ def _head(L, fr, cos, beard=False):
         lf = (X - C[0]) * fd[0] + (Y - C[1]) * fd[1]
         lu = (X - C[0]) * hd[0] + (Y - C[1]) * hd[1]
         return (lu < -3.6 + 0.15 * lf) & (lf > -1.5)
+    if cos.goatee:     # moustache et joues : zone etendue + bouc sous le menton
+        def beard_clip(X, Y, _b=beard_clip):   # noqa: F811
+            lf = (X - C[0]) * fd[0] + (Y - C[1]) * fd[1]
+            lu = (X - C[0]) * hd[0] + (Y - C[1]) * hd[1]
+            return _b(X, Y) | ((lu < -1.7) & (lu > -4.2) & (lf > 3.0))
     L.draw(head, (BEARD,), clip=beard_clip, edge=False, dither=False, cover=0.55)
+    if cos.goatee:
+        g0 = v_add(v_add(C, v_mul(fd, 4.6)), v_mul(hd, -5.6))
+        g1 = v_add(v_add(C, v_mul(fd, 5.0)), v_mul(hd, -8.6))
+        L.draw(Cap(g0, g1, 2.0, 1.2), (BEARD,), edge=False, dither=False, cover=0.45)
+    if cos.shine:      # crane rase : reflet
+        sp = v_add(v_add(C, v_mul(fd, 0.6)), v_mul(hd, HEAD_R - 1.2))
+        L.pixel(sp, EYE, only_on=set(SKIN))
+        L.pixel(v_add(sp, v_mul(fd, -1.0)), EYE, only_on=set(SKIN))
     # visage
     eye = v_add(v_add(C, v_mul(fd, 4.4)), v_mul(hd, 0.9))
     if p.face == 2:
@@ -397,9 +451,21 @@ def _head(L, fr, cos, beard=False):
     else:
         L.pixel(v_add(eye, v_mul(fd, -0.9)), EYE)
         L.pixel(eye, OUT)
-    brow_a = v_add(v_add(C, v_mul(fd, 3.0)), v_mul(hd, 2.4))
-    brow_b = v_add(v_add(C, v_mul(fd, 6.2)), v_mul(hd, 1.6))
-    L.line(brow_a, brow_b, HAIR_DK)
+    if cos.brow:
+        brow_a = v_add(v_add(C, v_mul(fd, 3.0)), v_mul(hd, 2.4))
+        brow_b = v_add(v_add(C, v_mul(fd, 6.2)), v_mul(hd, 1.6))
+        L.line(brow_a, brow_b, HAIR_DK)
+    if cos.glasses:    # monture noire rectangulaire + branche vers l'oreille
+        e0 = v_add(eye, v_mul(fd, -1.9))
+        e1 = v_add(eye, v_mul(fd, 2.1))
+        for a, b in ((v_add(e0, v_mul(hd, 1.7)), v_add(e1, v_mul(hd, 1.7))),
+                     (v_add(e0, v_mul(hd, -1.7)), v_add(e1, v_mul(hd, -1.7))),
+                     (v_add(e0, v_mul(hd, 1.7)), v_add(e0, v_mul(hd, -1.7))),
+                     (v_add(e1, v_mul(hd, 1.7)), v_add(e1, v_mul(hd, -1.7)))):
+            L.line(a, b, OUT)
+        L.line(e0, v_add(v_add(C, v_mul(fd, -1.0)), v_mul(hd, 1.0)), OUT)
+        L.pixel(v_add(eye, v_mul(fd, -0.6)), EYE)
+        L.pixel(v_add(eye, v_mul(fd, 0.7)), OUT)
     nose = v_add(v_add(C, v_mul(fd, 7.4)), v_mul(hd, -0.4))
     L.pixel(nose, SK_MID)
     L.pixel(v_add(nose, v_mul(hd, -1.0)), SK_SH)
